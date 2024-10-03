@@ -23,23 +23,58 @@ TO_MS = 10
 num_paquete = 0
 TIME_OFFSET = 30*60
 
+start_time = None
+end_time = None
+
+
+def end_program():
+	"""
+	Libera los recursos necesarios e imprime la información sobre
+	la ejecución del programa
+	"""
+
+	global handle
+
+	# Si se ha creado un dumper cerrarlo
+	if  pdumper_desc is not None:
+		pcap_dump_close(pdumper_desc)
+	if handle is not None:
+		pcap_close(handle)
+
+	# Imprimir info de la ejecucion
+	time_diff = 0
+	if start_time is not None:
+		time_diff = start_time - end_time
+
+	print(f'Number of packages received: {num_paquete}')
+	print(f'Time diff between first and last package: {time_diff}')
 
 
 def signal_handler(nsignal,frame):
 	logging.info('Control C pulsado')
 	if handle:
 		pcap_breakloop(handle)
+		end_program()
 		
 
 def procesa_paquete(us,header,data):
 	global num_paquete, pdumper
 	logging.info('Nuevo paquete de {} bytes capturado en el timestamp UNIX {}.{}'.format(header.len,header.ts.tv_sec,header.ts.tv_sec))
 	num_paquete += 1
+
 	#TODO imprimir los N primeros bytes
 	#Escribir el tráfico al fichero de captura con el offset temporal
+	if start_time is None:
+		start_time = time
+		end_time = time
+	else:
+		end_time = time
+
+	offset_temporal = end_time - start_time
+
 	
 if __name__ == "__main__":
-	global pdumper,args,handle
+	global pdumper,args,handle, pdumper_desc
 	parser = argparse.ArgumentParser(description='Captura tráfico de una interfaz ( o lee de fichero) y muestra la longitud y timestamp de los 50 primeros paquetes',
 	formatter_class=RawTextHelpFormatter)
 	parser.add_argument('--file', dest='tracefile', default=False,help='Fichero pcap a abrir')
@@ -53,6 +88,7 @@ if __name__ == "__main__":
 	else:
 		logging.basicConfig(level = logging.INFO, format = '[%(asctime)s %(levelname)s]\t%(message)s')
 
+# <CODIGO_NUESTRO>
 	if args.tracefile is False and args.interface is False:
 		logging.error('No se ha especificado interfaz ni fichero')
 		parser.print_help()
@@ -62,24 +98,24 @@ if __name__ == "__main__":
 		logging.error('Debes elegir una traza o una interfaz, no los dos a la vez')
 		parser.print_help()
 		sys.exit(-1)
+# </CODIGO_NUESTRO>
 
 	signal.signal(signal.SIGINT, signal_handler)
 
 	errbuf = bytearray()
 	handle = None
 	pdumper = None
-	pcap_desc = None
 	pdumper_desc = None
 
-
+# <CODIGO_NUESTRO>
 	if args.tracefile is not False:
 		# Abrir el archivo .pcap con trafico guardado
-		pcap_desc = pcap_open_offline(args.tracefile, errbuf)
+		handle = pcap_open_offline(args.tracefile, errbuf)
 	else:
 		# Abrir la interfaz para captura en vivo de trafico
-		pcap_desc = pcap_open_live(args.interface, args.nbytes, PROMISC, TO_MS, errbuf)
+		handle = pcap_open_live(args.interface, args.nbytes, PROMISC, TO_MS, errbuf)
 
-	if pcap_desc is None:
+	if handle is None:
 		print(errbuf.decode())
 		sys.exit(-1)
 
@@ -89,10 +125,9 @@ if __name__ == "__main__":
 		pdumper = pcap_dump_open(pdumper_desc, "salida.pcap")
 		if pdumper is None:
 			print("[ERROR]: Failed to create pdumper")
-			pcap_close(pcap_desc)
-			pcap_dump_close(pdumper_desc)
+			end_program()
 			sys.exit(-1)
-
+# </CODIGO_NUESTRO>
 
 	ret = pcap_loop(handle,50,procesa_paquete,None)
 	if ret == -1:
@@ -104,8 +139,7 @@ if __name__ == "__main__":
 	logging.info('{} paquetes procesados'.format(num_paquete))
 
 	# TODO: Printear info de ejecucion
-	if num_paquete < 2:
-		duracion = 0
+
 
 	# Si se ha creado un dumper cerrarlo
 	pcap_dump_close(pdumper_desc)
