@@ -6,10 +6,12 @@
     Muestra el tiempo de llegada de los primeros 50 paquetes a la interfaz especificada
     como argumento y los vuelca a traza nueva con tiempo actual
 
-    Autor: Javier Ramos <javier.ramos@uam.es>
-    2020 EPS-UAM
-	Pablo Tejero Lascorz (capitán cigarro) y Roberto Martin Alonso (sargento marihuano)
-	
+    Autores:
+    	- Javier Ramos <javier.ramos@uam.es> 2020 EPS-UAM
+     	- Pablo Tejero Lascorz (pablo.tejerol@estudiante.uam.es)
+      	- Roberto Martin Alonso (roberto.martinalonso@estudiante.uam.es)
+    Grupo 1313
+    Pareja 3
 '''
 
 import sys
@@ -19,6 +21,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 import time
 import logging
+import os
 from rc1_pcap import *
 
 ETH_FRAME_MAX = 1514
@@ -106,7 +109,7 @@ def procesa_paquete(us,header,data):
 	num_paquete += 1
 
 	#TODO imprimir los N primeros bytes
-	bpl = 0
+	bpl = 16
 	column = 0
 	for byte in data[0:min(args.nbytes, header.caplen)]:
 		if bpl == 16:
@@ -127,12 +130,11 @@ def procesa_paquete(us,header,data):
 
 
 	# Escribir paquete en fichero si se ha capturado de una interfaz en vivo
-	if args.interface is not None:
+	if args.interface:
 		if data[12] == 0x08 and data[13] == 0x00:
 			# Paquete con IP
 			pcap_dump(pdumper_ip, header, data)
 		else:
-			# Paquete sin IP
 			pcap_dump(pdumper_no_ip, header, data)
 
 
@@ -144,6 +146,7 @@ if __name__ == "__main__":
 	parser.add_argument('--file', dest='tracefile', default=False,help='Fichero pcap a abrir')
 	parser.add_argument('--itf', dest='interface', default=False,help='Interfaz a abrir')
 	parser.add_argument('--nbytes', dest='nbytes', type=int, default=14,help='Número de bytes a mostrar por paquete')
+	parser.add_argument('--npkt', dest='npkt', type=int, default=50,help='Número de paquetes a capturar')
 	parser.add_argument('--debug', dest='debug', default=False, action='store_true',help='Activar Debug messages')
 	args = parser.parse_args()
 
@@ -175,10 +178,10 @@ if __name__ == "__main__":
 	pdumper_no_ip = None		# Pdumper object for file to dump all packages that do not follow IP protocol
 
 # <CODIGO_NUESTRO>
-	if args.tracefile is not False:
+	if args.tracefile:
 		# Abrir el archivo .pcap con trafico guardado
 		handle = pcap_open_offline(args.tracefile, errbuf)
-	elif args.interface is not None:
+	elif args.interface:
 		# Abrir la interfaz para captura en vivo de trafico
 		handle = pcap_open_live(args.interface, args.nbytes, PROMISC, TO_MS, errbuf)
 		if handle is None:
@@ -187,11 +190,14 @@ if __name__ == "__main__":
 			sys.exit(-1)
 
 		# Crear ficheros y dumpers para guardar los paquetes capturados
+		if not os.path.exists('./capturas'):
+			os.mkdir('./capturas')
+
 		current_time_sec = time.time()
 		pdumper_desc_ip         = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
 		pdumper_desc_no_ip = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
-		pdumper_ip         = pcap_dump_open(pdumper_desc_ip,    'capturaNOIP.' + args.interface + '.' + f'{current_time_sec}' + '.pcap')
-		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, 'captura.'     + args.interface + '.' + f'{current_time_sec}' + '.pcap')
+		pdumper_ip         = pcap_dump_open(pdumper_desc_ip,    './capturas/captura.' + args.interface + '.' + f'{current_time_sec}' + '.pcap')
+		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, './capturas/capturaNOIP.'     + args.interface + '.' + f'{current_time_sec}' + '.pcap')
 
 		if pdumper_ip is None or pdumper_no_ip is None:
 			logging.error("[ERROR]: Failed to create pdumper")
@@ -204,11 +210,9 @@ if __name__ == "__main__":
 		end_program()
 		sys.exit(-1)
 
-	print('Vamos al loop')
-
 # </CODIGO_NUESTRO>
 
-	ret = pcap_loop(handle,10,procesa_paquete,None)
+	ret = pcap_loop(handle,args.npkt,procesa_paquete,None)
 	if ret == -1:
 		logging.error('Error al capturar un paquete')
 	elif ret == -2:
