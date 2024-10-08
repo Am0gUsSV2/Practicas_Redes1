@@ -111,7 +111,11 @@ def procesa_paquete(us,header,data):
 	#TODO imprimir los N primeros bytes
 	bpl = 16
 	column = 0
-	for byte in data[0:min(args.nbytes, header.caplen)]:
+	if args.nbytes == -1:
+		len_paquete = header.caplen
+	else:
+		len_paquete = min(args.nbytes, header.caplen)
+	for byte in data[0:len_paquete]:
 		if bpl == 16:
 			print('\n        0x{:08X}:  '.format(column), end='')
 			bpl = 0
@@ -141,12 +145,12 @@ def procesa_paquete(us,header,data):
 
 if __name__ == "__main__":
 	global args,handle, dumper_ip, pdumper_no_ip, pdumper_desc_ip, pdumper_desc_no_ip
-	parser = argparse.ArgumentParser(description='Captura tráfico de una interfaz ( o lee de fichero) y muestra la longitud y timestamp de los 50 primeros paquetes',
+	parser = argparse.ArgumentParser(description='Captura tráfico de una interfaz ( o lee de fichero) y muestra la longitud y timestamp de los npkt primeros paquetes',
 	formatter_class=RawTextHelpFormatter)
 	parser.add_argument('--file', dest='tracefile', default=False,help='Fichero pcap a abrir')
 	parser.add_argument('--itf', dest='interface', default=False,help='Interfaz a abrir')
-	parser.add_argument('--nbytes', dest='nbytes', type=int, default=14,help='Número de bytes a mostrar por paquete')
-	parser.add_argument('--npkt', dest='npkt', type=int, default=50,help='Número de paquetes a capturar')
+	parser.add_argument('--nbytes', dest='nbytes', type=int, default=-1,help='Número de bytes a mostrar por paquete')
+	parser.add_argument('--npkt', dest='npkt', type=int, default=-1,help='Número de paquetes a capturar')
 	parser.add_argument('--debug', dest='debug', default=False, action='store_true',help='Activar Debug messages')
 	args = parser.parse_args()
 
