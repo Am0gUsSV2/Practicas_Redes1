@@ -1,3 +1,6 @@
+# !/usr/bin/python3
+# -*- coding: utf-8 -*_
+
 '''
     practica1.py
     Muestra el tiempo de llegada de los primeros 50 paquetes a la interfaz especificada
@@ -25,31 +28,39 @@ TO_MS = 10
 num_paquete = 0
 TIME_OFFSET = 30*60
 
+
 class mutable_timeval:
 	"""
 
 	"""
 
-	def __init__(self, sec, usec):
+	def __init__(self, sec: int, usec: int):
 		self.sec = sec
 		self.usec = usec
 
-	def set_val(self, sec, usec):
+	def set_val(self, sec: int, usec: int)-> None:
 		self.sec = sec
 		self.usec = usec
 
-	def equals(self, sec, usec):
-		return self.sec == sec and self.usec == self.usec
+	def equals(self, sec: int, usec: int)-> bool:
+		return self.sec == sec and self.usec == usec
 
 	@classmethod
 	def substract(cls, op1, op2):
-		return cls(op1.sec - op2.sec, op1.usec - op2.usec)
+		sec = op1.sec - op2.sec
+		usec = op1.usec - op2.usec
+
+		if usec < 0:
+			sec -= 1
+			usec += 1000000
+
+		return cls(sec, usec)
 
 start_time = mutable_timeval(0,0)
 end_time = mutable_timeval(0,0)
 
 
-def dump_close(pdumper, pdumper_desc):
+def pdumper_close(pdumper: pcap_dumper_t, pdumper_desc: pcap_t)-> None:
 	if pdumper_desc is None:
 		return
 
@@ -68,39 +79,51 @@ def end_program():
 	global handle, pdumper_desc_ip, pdumper_desc_no_ip, pdumper_ip, pdumper_no_ip
 
 	# Si se han creado ficheros para guardar paquetes, cerrarlos y liberar los dumpers
-	dump_close(pdumper_ip, pdumper_desc_ip)
-	dump_close(pdumper_no_ip, pdumper_desc_no_ip)
+	pdumper_close(pdumper_ip, pdumper_desc_ip)
+	pdumper_close(pdumper_no_ip, pdumper_desc_no_ip)
 
+	# Cerrar fichero o interfaz de captura
 	if handle:
 		pcap_close(handle)
 
 	# Imprimir info de la ejecucion
-	time_diff = mutable_timeval.substract(start_time, end_time)
+	time_diff = mutable_timeval.substract(end_time, start_time)
 
 	print(f'Number of packages received: {num_paquete}')
-	print(f'Time diff between first and last package: {time_diff.sec}.{time_diff.usec}')
+	print('Time diff between first and last package: {}.{:06d}'.format(time_diff.sec, time_diff.usec))
 
 
 def signal_handler(nsignal,frame):
 	logging.info('Control C pulsado')
 	if handle:
 		pcap_breakloop(handle)
-		end_program()
+	end_program()
 		
 
 def procesa_paquete(us,header,data):
 	global num_paquete
-	logging.info('Nuevo paquete de {} bytes capturado en el timestamp UNIX {}.{}'.format(header.len,header.ts.tv_sec,header.ts.tv_usec))
+	logging.info('Nuevo paquete de {} bytes capturado en el timestamp UNIX {}.{:06d}'.format(header.len,header.ts.tv_sec,header.ts.tv_usec))
 	num_paquete += 1
 
 	#TODO imprimir los N primeros bytes
+	bpl = 0
+	column = 0
+	for byte in data[0:min(args.nbytes, header.caplen)]:
+		if bpl == 16:
+			print('\n        0x{:08X}:  '.format(column), end='')
+			bpl = 0
+			column += 16
+
+		print('{:02X} '.format(byte), end='')
+		bpl += 1
+			
+	print('')
 
 	# Actualizar tiempo del ultimo paquete recibido
-	if start_time.equals(0,0):
+	if num_paquete == 1:
 		start_time.set_val(header.ts.tv_sec, header.ts.tv_usec)
-		end_time.set_val(header.ts.tv_sec, header.ts.tv_usec)
-	else:
-		end_time.set_val(header.ts.tv_sec, header.ts.tv_usec)
+
+	end_time.set_val(header.ts.tv_sec, header.ts.tv_usec)
 
 
 	# Escribir paquete en fichero si se ha capturado de una interfaz en vivo
@@ -159,30 +182,33 @@ if __name__ == "__main__":
 		# Abrir la interfaz para captura en vivo de trafico
 		handle = pcap_open_live(args.interface, args.nbytes, PROMISC, TO_MS, errbuf)
 		if handle is None:
-			print(errbuf.decode())
+			logging.error('[ERROR]: Failed to open interface: ' + errbuf.decode())
 			end_program()
 			sys.exit(-1)
+
 		# Crear ficheros y dumpers para guardar los paquetes capturados
 		current_time_sec = time.time()
-		pdumper_desc_ip    = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
+		pdumper_desc_ip         = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
 		pdumper_desc_no_ip = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
-		pdumper_ip    = pcap_dump_open(pdumper_desc_ip,    'capturaNOIP.' + args.interface + '.' + current_time_sec + '.pcap')
-		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, 'captura.'     + args.interface + '.' + current_time_sec + '.pcap')
+		pdumper_ip         = pcap_dump_open(pdumper_desc_ip,    'capturaNOIP.' + args.interface + '.' + f'{current_time_sec}' + '.pcap')
+		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, 'captura.'     + args.interface + '.' + f'{current_time_sec}' + '.pcap')
 
-		if pdumper_ip is None or pdumper_no_ip:
-			print("[ERROR]: Failed to create pdumper")
+		if pdumper_ip is None or pdumper_no_ip is None:
+			logging.error("[ERROR]: Failed to create pdumper")
 			end_program()
 			sys.exit(-1)
 
 
 	if handle is None:
-		print(errbuf.decode())
+		logging.error('[ERROR]: Failed to open tracefile: ' + errbuf.decode())
 		end_program()
 		sys.exit(-1)
 
+	print('Vamos al loop')
+
 # </CODIGO_NUESTRO>
 
-	ret = pcap_loop(handle,50,procesa_paquete,None)
+	ret = pcap_loop(handle,10,procesa_paquete,None)
 	if ret == -1:
 		logging.error('Error al capturar un paquete')
 	elif ret == -2:
@@ -191,6 +217,6 @@ if __name__ == "__main__":
 		logging.debug('No mas paquetes o limite superado')
 	logging.info('{} paquetes procesados'.format(num_paquete))
 
-	
+
 	# Liberar recursos y mostrar información de la ejecución
 	end_program()
