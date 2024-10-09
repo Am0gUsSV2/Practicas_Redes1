@@ -3,8 +3,10 @@
 
 '''
     practica1.py
-    Muestra el tiempo de llegada de los primeros 50 paquetes a la interfaz especificada
-    como argumento y los vuelca a traza nueva con tiempo actual
+    1-Captura n paquetes especificados de una interfaz determinada, imprime sus nbytes primeros de cada uno de ellos y los guarda en dos archivos 
+	segun sigan o no el protocolo IP
+
+	2-Muestra los nbytes primeros de los n paquetes especificados de un fichero de trazas especificado
 
     Autores:
     	- Javier Ramos <javier.ramos@uam.es> 2020 EPS-UAM
