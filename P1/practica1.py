@@ -9,9 +9,9 @@
 	2-Muestra los nbytes primeros de los n paquetes especificados de un fichero de trazas especificado
 
     Autores:
-    	- Javier Ramos <javier.ramos@uam.es> 2020 EPS-UAM
-     	- Pablo Tejero Lascorz (pablo.tejerol@estudiante.uam.es)
-      	- Roberto Martin Alonso (roberto.martinalonso@estudiante.uam.es)
+    	- Javier Ramos          <javier.ramos@uam.es> 2020 EPS-UAM
+     	- Pablo Tejero Lascorz  <pablo.tejerol@estudiante.uam.es>
+      	- Roberto Martin Alonso <roberto.martinalonso@estudiante.uam.es>
     Grupo 1313
     Pareja 3
 '''
@@ -21,9 +21,10 @@ import binascii
 import signal
 import argparse
 from argparse import RawTextHelpFormatter
-import time
+from time import time
 import logging
-import os
+from os.path import exists
+from os import mkdir
 from rc1_pcap import *
 
 ETH_FRAME_MAX = 1514
@@ -36,7 +37,7 @@ TIME_OFFSET = 30*60
 
 class mutable_timeval:
 	"""
-
+	Almacena un valor de tiempo como segundos y microsegundos.
 	"""
 
 	def __init__(self, sec: int, usec: int):
@@ -52,6 +53,10 @@ class mutable_timeval:
 
 	@classmethod
 	def substract(cls, op1, op2):
+		"""
+		Calcula op1 - op2 y devuelve el resultado como un nuevo
+		mutable_timeval
+		"""
 		sec = op1.sec - op2.sec
 		usec = op1.usec - op2.usec
 
@@ -66,13 +71,13 @@ end_time = mutable_timeval(0,0)
 
 
 def pdumper_close(pdumper: pcap_dumper_t, pdumper_desc: pcap_t)-> None:
-	if pdumper_desc is None:
-		return
-
+	"""
+	Cierra un pdumper y un descriptor de pdumper asociados
+	"""
 	if pdumper is not None:
 		pcap_dump_close(pdumper)
-	
-	pcap_close(pdumper_desc)
+	if pdumper_desc is not None:
+		pcap_close(pdumper_desc)
 
 
 def end_program():
@@ -137,7 +142,7 @@ def procesa_paquete(us,header,data):
 
 	# Escribir paquete en fichero si se ha capturado de una interfaz en vivo
 	if args.interface:
-		if data[12] == 0x08 and data[13] == 0x00:
+		if header.caplen > 13 and data[12] == 0x08 and data[13] == 0x00:
 			# Paquete con IP
 			pcap_dump(pdumper_ip, header, data)
 		else:
@@ -189,30 +194,27 @@ if __name__ == "__main__":
 		handle = pcap_open_offline(args.tracefile, errbuf)
 	elif args.interface:
 		# Abrir la interfaz para captura en vivo de trafico
-		handle = pcap_open_live(args.interface, args.nbytes, PROMISC, TO_MS, errbuf)
+		handle = pcap_open_live(args.interface, ETH_FRAME_MAX, NO_PROMISC, TO_MS, errbuf)
 		if handle is None:
 			logging.error('[ERROR]: Failed to open interface: ' + errbuf.decode())
 			end_program()
 			sys.exit(-1)
 
 		# Crear ficheros y dumpers para guardar los paquetes capturados
-		if not os.path.exists('./capturas'):
-			os.mkdir('./capturas')
-
-		current_time_sec = time.time()
-		pdumper_desc_ip         = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
+		current_time_sec = time()
+		pdumper_desc_ip    = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
 		pdumper_desc_no_ip = pcap_open_dead(DLT_EN10MB, ETH_FRAME_MAX)
-		pdumper_ip         = pcap_dump_open(pdumper_desc_ip,    './capturas/captura.' + args.interface + '.' + f'{current_time_sec}' + '.pcap')
-		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, './capturas/capturaNOIP.'     + args.interface + '.' + f'{current_time_sec}' + '.pcap')
+		pdumper_ip    = pcap_dump_open(pdumper_desc_ip,    './captura.'     + args.interface + '.' + f'{current_time_sec}' + '.pcap')
+		pdumper_no_ip = pcap_dump_open(pdumper_desc_no_ip, './capturaNOIP.' + args.interface + '.' + f'{current_time_sec}' + '.pcap')
 
 		if pdumper_ip is None or pdumper_no_ip is None:
-			logging.error("[ERROR]: Failed to create pdumper")
+			logging.error('[ERROR]: Failed to create pdumper')
 			end_program()
 			sys.exit(-1)
 
 
 	if handle is None:
-		logging.error('[ERROR]: Failed to open tracefile: ' + errbuf.decode())
+		logging.error('[ERROR]: Failed to open tracefile: ', errbuf.decode())
 		end_program()
 		sys.exit(-1)
 

@@ -1,57 +1,113 @@
+================================================
 PRACTICA 1
+================================================
 
-El programa analizará paquetes de red. Puede analizar tanto paquetes recibidos en vivo como paquetes guardados en un fichero. 
-Para ello, hace uso de la librería `pcap`.
+El programa analizará paquetes de red. Puede analizar tanto paquetes recibidos en vivo como paquetes
+guardados en un fichero. Para ello, hace uso de la librería pcap.
 
-Autores: Roberto Martín Alonso, Pablo Tejero Lascorz  
-Grupo: 1311  
-Pareja: 03  
-
-
--Contenido
-
-    practica1.py: Contiene la lógica del programa para procesar y analizar los paquetes.
-    rc1_pcap.py: *wrapper* en Python para la librería `libpcap`.
-    Captura de pantalla 2024-10-09 175209.png: Captura de pantalla comparando traza obtenida con el programa vs la obtenida con Wireshark
+Autores: Roberto Martín Alonso, Pablo Tejero Lascorz
+Grupo: 1311
+Pareja: 03
 
 
--Requisitos
+------------------------------------------
+Contenido
+------------------------------------------
+
+    > practica1.py: Contiene la lógica del programa para procesar y analizar los paquetes.
+    > rc1_pcap.py: wrapper en Python para la librería libpcap.
+    > Captura de pantalla 2024-10-09 175209.png: Captura de pantalla comparando traza obtenida con el
+      programa vs la obtenida con Wireshark
+
+
+------------------------------------------
+Requisitos
+------------------------------------------
 
     Sistema Operativo: Linux
     Otras Dependencias: libpcap.so
 
 
--Instrucciones de uso
+------------------------------------------
+Instrucciones de uso
+------------------------------------------
 
-    El programa necesitará permisos de superusuario para poder capturar paquetes de una interfaz en vivo. Además, se le deberán pasar como argumentos ciertos datos:
+    El programa necesitará permisos de superusuario para poder capturar paquetes de una interfaz en vivo.
+    Además, se le deberán pasar como argumentos ciertos datos:
 
-    sudo python3 practica1.py [--file] [--itf] [--nbytes] [--npkt]
+        sudo python3 practica1.py [--file TRACEFILE] [--itf INTERFACE] [--nbytes NBYTES] [--npkt NPKT]
 
     El programa recibirá los siguientes parámetros:
-    * --file: Nombre del fichero `.pcap` del que leer paquetes
-    * --itf: Nombre de la interfaz en vivo de la que capturar paquetes
-    * --nbytes: Número de bytes al principio de cada paquete recibido que se imprimirán
-    * --npkt: Número de paquetes a procesar
+      --file   : Nombre del fichero .pcap del que leer paquetes
+      --itf    : Nombre de la interfaz en vivo de la que capturar paquetes
+      --nbytes : Número de bytes al principio de cada paquete recibido que se imprimirán
+      --npkt   : Número de paquetes a procesar
 
     Se deberá proporcionar o una interfaz de captura o una traza guardada, pero no los dos al mismo tiempo.
 
 
--Como se han obtenido los resultados:
-    Para la validacion de nuestro programa y Wireshark se han puesto a capturar de forma casi simultanea los dos programas a la vez y cuando
-    el nuestro terminaba de recibir los 33 paquetes se paraba la captura de Wireshark. Las trazas de Wireshark se exportan a un fichero .pcapng
-    y se leen con nuestro programa tanto el fichero de Wireshark como el generado por nuestro programa y como se puede comprobar los datos
-    obtenidos son los mismos
+
+------------------------------------------
+Validación de resultados
+------------------------------------------
+
+    Para la validación de nuestro programa se ha ejecutado simultáneamente junto a Wireshark. Cuando nuestro
+    programa recibía los paquetes establecidos como límite se paraba la captura de Wireshark. Las trazas de
+    Wireshark se exportan a un fichero .pcapng y se leen con nuestro programa tanto el fichero de Wireshark
+    como el generado por nuestro programa, observando que los datos coinciden.
 
 
--Análisis de Criterios de Evaluación
+------------------------------------------
+Problemas
+------------------------------------------
 
-    Normativa de entrega cumplida en su totalidad: 5% supongo no?
-    Fichero leeme.txt bien explicado: 5% falta que pablo ponga su mucho texto y alguna mierda mutable de las que le gustan
-    Contar paquetes de una traza (independientemente del número de paquetes): 15% si
-    Contar paquetes de la interfaz de red: 10% si
-    Uso de un único "flujo" para traza e interfaz: 10% si
-    Almacenar correctamente el tráfico capturado en vivo una traza: 5% si
-    Separar correctamente el trafico capturado en dos trazas: 10% si
-    Gestionar  correctamente el numero de paquetes a leer 10% si
-    Calcular tiempo entre último y primer paquete: 10% si
-    Imprimir los N primeros bytes de un paquete (pruebe para N>32) y validarlo con Wireshark (captura de pantalla): 20% Si
+    Se ha detectado un problema al enviar la señal SIGINT con Ctrl+C: se supone que debe finalizar el programa,
+    pero ni siquiera entra en la rutina de manejo de la señal. Asumimos que no es un error nuestro al formar
+    parte del código que se nos proporcionaba de base.
+
+------------------------------------------
+Análisis de criterios de evaluación
+------------------------------------------
+
+    [1] Normativa de entrega cumplida en su totalidad
+        STATUS : Realizado
+        NOTAS  : Varias relecturas del enunciado y revisión del archivo subido.
+
+    [2] Contar paquetes de una traza
+        STATUS : Realizado
+        NOTAS  : Se ha comprobado que el número de paquetes coincide con los de Wireshark (si la traza
+                 proviene de allí) o con los que habíamos capturado previamente (si la traza la creamos
+                 nosotros al capturar de una interfaz).
+
+    [3] Contar paquetes de una interfaz de red
+        STATUS : Realizado
+        NOTAS  : Se ha comprobado que el número de paquetes coincide con los de Wireshark
+
+    [4] Uso de un único flujo para traza e interfaz
+        STATUS : Realizado
+        NOTAS  : El flujo general es el mismo para los dos casos, variando solo lo justo y necesario.
+
+    [5] Almacenar correctamente el tráfico capturado en vivo en una traza
+        STATUS : Realizado
+        NOTAS  : Se guardan todos los paquetes capturados al completo (con un tamaño máximo de 1514
+                 bytes).
+
+    [6] Separar correctamente el tráfico capturado en dos trazas:
+        STATUS : Realizado
+        NOTAS  : Se crean al principio de la ejecución los dos ficheros solicitados y se guardan los
+                 paquetes en uno o en otro en función de si siguen el protocolo IP, siempre que establecidos
+                 se hayan capturado de una interfaz de red. Los ficheros tienen el nombre requerido.
+
+    [7] Gestionar correctamente el número de paquetes a leer
+        STATUS : Realizado
+        NOTAS  : El programa admite capturar tanto un número concreto como uno ilimitado de paquetes.
+
+    [8] Calcular el tiempo entre el primer y el último paquete recibido
+        STATUS : Realizado
+        NOTAS  : El programa siempre lleva la cuenta de los tiempos de captura del primer paquete y del
+                 último paquete recibido. Al finalizar, imprime la diferencia de los tiempos.
+
+    [9] Imprimir los primeros N bytes de un paquete y validarlo con WHireshark
+        STATUS : Realizado
+        NOTAS  : Se imprimen los bytes adecuadamente. Si el tamaño de un paquete es menor al de nbytes, se
+                 imprime el paquete al completo sin ningún error. Los datos coinciden con los de Wireshark.
