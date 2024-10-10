@@ -17,14 +17,11 @@
 '''
 
 import sys
-import binascii
 import signal
 import argparse
 from argparse import RawTextHelpFormatter
 from time import time
 import logging
-from os.path import exists
-from os import mkdir
 from rc1_pcap import *
 
 ETH_FRAME_MAX = 1514
