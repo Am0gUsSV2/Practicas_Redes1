@@ -4,8 +4,6 @@
 deploymn:
 	sudo systemctl stop network-manager
 	sudo mn --nat
-	gterm h1
-	gterm h2
 
 t11:
 	rm -rf __pycache__

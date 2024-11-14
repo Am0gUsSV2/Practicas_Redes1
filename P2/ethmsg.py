@@ -39,24 +39,15 @@ def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac
     '''
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = False
+    logging.debug('[FUNC]: process_ethMsg_frame')
+
     ip = struct.unpack('!I', data[0:4])[0]
     time_sec = header.ts.tv_sec
     time_usec = header.ts.tv_usec
 
-    mac6 = struct.unpack('!H', srcMac[0:2])[0]
-    mac5 = struct.unpack('!H', srcMac[2:4])[0]
-    mac4 = struct.unpack('!H', srcMac[4:6])[0]
-    mac3 = struct.unpack('!H', srcMac[6:8])[0]
-    mac2 = struct.unpack('!H', srcMac[8:10])[0]
-    mac1 = struct.unpack('!H', srcMac[10:12])[0]
 
-    ip4 = (ip & 0x000000FF) >> 0x00
-    ip3 = (ip & 0x0000FF00) >> 0x08
-    ip2 = (ip & 0x00FF0000) >> 0x10
-    ip1 = (ip & 0xFF000000) >> 0x18
-
-    str_mac = f'{hex(mac1)}.{hex(mac2)}.{hex(mac3)}.{hex(mac4)}.{hex(mac5)}.{hex(mac6)}'
-    str_ip  = f'{ip1}.{ip2}.{ip3}.{ip4}'
+    str_mac = pt.MAC_to_str(srcMac)
+    str_ip  = pt.IP_to_str(ip)
 
     print(f'[{time_sec}.{time_usec}] {str_mac} -> {str_ip}')
 
@@ -74,7 +65,7 @@ def initEthMsg(interface:str) -> int:
     registerEthCallback(process_ethMsg_frame, ETHTYPE)
 
 
-def sendEthMsg(ip:int, message:bytes) -> bytes:
+def sendEthMsg(ip:int, message: bytes) -> bytes:
     '''
         Nombre: sendEthMsg
         Descripción: Esta función mandara un mensaje en broacast 
@@ -94,7 +85,7 @@ def sendEthMsg(ip:int, message:bytes) -> bytes:
     # TODO: check if ip es data[0:3] o data[0:4]
     # NOTE: TESTED = False
     data = bytes()
-    data += struct.pack('!!I', ip)
+    data += struct.pack('!I', ip)
     data += message
 
     return sendEthernetFrame(data, len(data), ETHTYPE, broadcast)

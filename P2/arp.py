@@ -68,7 +68,7 @@ OPCODE_ARP_REPLY   = 0x0002 # El tipo de mensaje ARP es Reply
 ETHERTYPE_IP =  0x0800      # Protocolo de nivel superior: IP
 ETHERTYPE_ARP = 0x0806      # Protocolo de nivel superior: ARP
 
-
+import printer as pt
 
 def getIP(interface:str) -> int:
     '''
@@ -167,6 +167,9 @@ def processARPReply(data:bytes,MAC:bytes)->None:
     #NOTE: STATUS = Implemented
     #NOTE: TESTED = False
     global myIP, globalLock
+    logging.debug('[FUNC] processARPReply')
+
+    dt.print_ARP_reply(data)
 
     mac_orig: bytes = data[SMAC_S:SMAC_E]
     mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
@@ -236,7 +239,7 @@ def createARPReply(IP:int ,MAC:bytes) -> bytes:
     request = bytes()
     request += struct.pack('!H', HW_TYPE_ETHERNET)
     request += struct.pack('!H', PR_TYPE_IPV4)
-    request += struct.pack('B', ETHERNET_SIZE)
+    request += struct.pack('!B', ETHERNET_SIZE)
     request += struct.pack('!B', IPV4_SIZE)
     request += struct.pack('!H', OPCODE_ARP_REQUEST)
     request += myMAC
@@ -321,33 +324,52 @@ def initARP(interface:str) -> int:
     request = createARPRequest(myIP)
     logging.debug(f'Request: [{request}]')
 
+    # Indicar que esperamos una respuesta
+    with globalLock:
+        awaitingResponse = True
+
+    # Enviar peticiones
     for _ in range(3):# NOTE  28 = len(request)
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
         if result == -1:
             logging.error('[ERROR]: No se ha podido mandar la petición de ARP gratuito.')
             return -1
 
-        NUMERIN_MAGIC_ALONSO = 0.2
-        MAX_TRIES = 15
-        num_tries = 0
 
-        while num_tries < MAX_TRIES:
-            with globalLock:
-                lcl_awaiting_response = awaitingResponse
-                lcl_resolved_MAC = resolvedMAC
+    NUMERIN_MAGIC_ALONSO = 0.2
+    MAX_TRIES = 25
+    num_tries = 0
 
-            if lcl_awaiting_response is True:
-                num_tries += 1
-                time.sleep(NUMERIN_MAGIC_ALONSO)
-            else:
-                if lcl_resolved_MAC != myMAC:
-                    logging.error('Alguien más tiene mi dirección IP')
-                    return -1
-                break
+    # Esperar una respuesta. Maximo tiempo de espera: 5 segundoss
+    while num_tries < MAX_TRIES:
+        with globalLock:
+            lcl_awaiting_response = awaitingResponse
+            lcl_resolved_MAC = resolvedMAC
+
+        # Si nos llega respuesta, entonces alguien más tiene nuestra IP
+        if lcl_awaiting_response is False:
+            logging.error('Alguien más tiene mi dirección IP')
+            return -1
+
+        # Esperamos hasta volver a comprobar
+        num_tries += 1
+        time.sleep(NUMERIN_MAGIC_ALONSO)
+
+
+    # Cambiar awaiting response, ya no esperamos respuesta
+    if lcl_awaiting_response is True:
+        with globalLock:
+            awaitingResponse = False
+    else:
+        logging.error('Alguien más tiene mi dirección IP')
+        return -1
+
 
     arpInitialized = True
 
     return 0
+
+
 
 def ARPResolution(ip:int) -> bytes:
     '''

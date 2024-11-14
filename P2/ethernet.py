@@ -12,6 +12,7 @@ import struct
 from binascii import hexlify
 import struct
 import threading
+import printer as pt
 #Tamaño máximo de una trama Ethernet (para las prácticas)
 ETH_FRAME_MAX = 1514
 #Tamaño mínimo de una trama Ethernet
@@ -80,18 +81,20 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
     '''
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = false
-    global myMAC
+    global macAddress
+
     logging.debug('[FUNC] process_Ethernet_frame')
     logging.debug('Trama nueva recibida.')
 
     mac_orig = data[SETH_S:SETH_E]
     mac_dest = data[TETH_S:TETH_E]
-    ethertype = data[ETHERTYPE_S:ETHERTYPE_E]
+    ethertype = struct.unpack('!H', data[ETHERTYPE_S:ETHERTYPE_E])[0]
 
-    myMAC = getHwAddr(ethertype)
+    pt.print_ethernet_header(data, 0)
+    # myMAC = getHwAddr(str(ethertype))
 
     # Comprobar si el paquete es para nosotros (incluye broadcast)
-    if mac_dest != myMAC and mac_dest != broadcastAddr:
+    if mac_dest != macAddress and mac_dest != broadcastAddr:
         return
 
     # Procesar la trama
@@ -212,6 +215,7 @@ def startEthernetLevel(interface:str) -> int:
     recvThread = rxThread()
     recvThread.daemon = True
     recvThread.start()
+
 
     levelInitialized = True
 

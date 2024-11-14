@@ -52,7 +52,10 @@ if __name__ == "__main__":
 	if (startEthernetLevel(args.interface) != 0):
 		logging.error('Ethernet no inicializado')
 		sys.exit(-1)
-	# TODO iniciar nivel EthMsg
+	
+	#Inicializamos nivel EthMsg
+	initEthMsg(args.interface)
+
 	#Inicializamos ARP. Si no podemos inicializar salimos.
 	if initARP(args.interface) == -1:
 		logging.error('ARP no inicializado')
@@ -103,7 +106,7 @@ if __name__ == "__main__":
 				mensaje = " ".join(partes[2:])
 				print(f"Enviando mensaje: {mensaje}")
 				# Aquí puedes llamar a una función que maneje el envío de mensajes
-				sendEthMsg(ip, mensaje)
+				sendEthMsg(ip, mensaje.encode())
 			#TODO ARP gratuito
 			else:
 				print("Comando no reconocido. 'h' para ayuda.\n")
