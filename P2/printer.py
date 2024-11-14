@@ -25,9 +25,15 @@ def IP_to_str(ip: int) -> str:
 def print_ethernet_header(data: bytes, ident: int = 0):
 	print("\t"*ident, 'ETHERNET FRAME:')
 	ident += 1
-	print("\t"*ident, 'Orig MAC:  ', MAC_to_str(data[0:6]))
-	print("\t"*ident, 'Dest MAC:  ', MAC_to_str(data[6:12]))
+	print("\t"*ident, 'Dest MAC:  ', MAC_to_str(data[0:6]))
+	print("\t"*ident, 'Orig MAC:  ', MAC_to_str(data[6:12]))
 	print("\t"*ident, 'Ethertype: ', f'{ struct.unpack("!H", data[12:14])[0] :04x}')
+
+
+def print_ethernet_message(data: bytes, ident: int = 0):
+	print("\t"*ident, 'MESSAGE:')
+	ident += 1
+	print("\t"*ident, f'[{data[18:].decode("utf-8")}]')
 
 
 def print_ARP_reply(data: bytes, ident: int = 0):

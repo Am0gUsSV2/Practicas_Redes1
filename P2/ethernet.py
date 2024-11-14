@@ -31,10 +31,10 @@ levelInitialized = False
 # Indices para cabeceras de tramas Ethernet
 #   S : Start index
 #   E : End index
-SETH_S = 0          # Sender (orig) MAC
-SETH_E = 5+1
-TETH_S = 6          # Target (dest) MAC
-TETH_E = 11+1
+TETH_S = 0          # Sender (orig) MAC
+TETH_E = 5+1
+SETH_S = 6          # Target (dest) MAC
+SETH_E = 11+1
 ETHERTYPE_S = 12    # Ethertype
 ETHERTYPE_E = 13+1
 
@@ -92,6 +92,8 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
 
     pt.print_ethernet_header(data, 0)
     # myMAC = getHwAddr(str(ethertype))
+
+    pt.print_ethernet_message(data, 0)
 
     # Comprobar si el paquete es para nosotros (incluye broadcast)
     if mac_dest != macAddress and mac_dest != broadcastAddr:

@@ -13,6 +13,7 @@ import fcntl
 import time
 from threading import Lock
 from expiringdict import ExpiringDict
+from arp import ARPResolution
 
 ETHTYPE = 0x3003
 #Dirección de difusión (Broadcast)
@@ -39,7 +40,7 @@ def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac
     '''
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = False
-    logging.debug('[FUNC]: process_ethMsg_frame')
+    logging.debug('[FUNC] process_ethMsg_frame')
 
     ip = struct.unpack('!I', data[0:4])[0]
     time_sec = header.ts.tv_sec
@@ -84,8 +85,15 @@ def sendEthMsg(ip:int, message: bytes) -> bytes:
     # TODO: Control de errores
     # TODO: check if ip es data[0:3] o data[0:4]
     # NOTE: TESTED = False
+    logging.debug('[FUNC] sendEthMsg')
     data = bytes()
     data += struct.pack('!I', ip)
     data += message
 
-    return sendEthernetFrame(data, len(data), ETHTYPE, broadcast)
+
+    destMac = ARPResolution(ip)
+
+    if destMac is None:
+        logging.error("No se ha podido obtener la direccion mac dada la ip")
+
+    return sendEthernetFrame(data, len(data), ETHTYPE, destMac)

@@ -49,24 +49,24 @@ OPCODE_S = 6    # Opcode
 OPCODE_E = 7+1
 SMAC_S   = 8    # Sender (orig) MAC
 SMAC_E   = 13+1
-TMAC_S   = 14   # Target (dest) MAC
-TMAC_E   = 17+1
-SIP_S    = 18   # Sender (orig) IP
-SIP_E    = 23+1
+SIP_S    = 14   # Target (dest) MAC
+SIP_E    = 17+1
+TMAC_S   = 18   # Sender (orig) IP
+TMAC_E   = 23+1
 TIP_S    = 24   # Target (dest) IP
 TIP_E    = 27+1
 
 
 # Otras macros
-HW_TYPE_ETHERNET = 0x0001   # Indica que las direcciones de nivel de enlace son de tipo Ethernet
-PR_TYPE_IPV4     = 0x8000   # Indica que el protocolo de nivel de red es IPv4
-ETHERNET_SIZE = 0x06        # Tamano de direcciones Ethernet
-IPV4_SIZE     = 0x04        # Tamano de direcciones IPv4
+HW_TYPE_ETHERNET   = 0x0001   # Indica que las direcciones de nivel de enlace son de tipo Ethernet
+PR_TYPE_IPV4       = 0x8000   # Indica que el protocolo de nivel de red es IPv4
+ETHERNET_SIZE      = 0x06        # Tamano de direcciones Ethernet
+IPV4_SIZE          = 0x04        # Tamano de direcciones IPv4
 OPCODE_ARP_REQUEST = 0x0001 # El tipo de mensaje ARP es Request
 OPCODE_ARP_REPLY   = 0x0002 # El tipo de mensaje ARP es Reply
 
-ETHERTYPE_IP =  0x0800      # Protocolo de nivel superior: IP
-ETHERTYPE_ARP = 0x0806      # Protocolo de nivel superior: ARP
+ETHERTYPE_IP       =  0x0800      # Protocolo de nivel superior: IP
+ETHERTYPE_ARP      = 0x0806      # Protocolo de nivel superior: ARP
 
 import printer as pt
 
@@ -78,6 +78,7 @@ def getIP(interface:str) -> int:
             -interface: nombre de la interfaz
         Retorno: Entero de 32 bits con la dirección IP de la interfaz
     '''
+    logging.debug("[FUCN] getIP")
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip = fcntl.ioctl(
         s.fileno(),
@@ -124,6 +125,7 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
     '''
     #NOTE: STATUS = Implemented
     #NOTE: TESTED = False
+    logging.debug("[FUCN] processARPRequest")
     mac_orig: bytes = data[SMAC_S:SMAC_E]
     mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
     ip_orig: bytes  = struct.unpack('!I', data[SIP_S:SIP_E])[0]
@@ -198,7 +200,6 @@ def processARPReply(data:bytes,MAC:bytes)->None:
         cache[ip_orig] = mac_orig      
 
 
-
 def createARPRequest(ip:int) -> bytes:
     '''
         Nombre: createARPRequest
@@ -208,6 +209,7 @@ def createARPRequest(ip:int) -> bytes:
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
+    logging.debug("[FUCN] createARPRequest")
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = false
     request = bytes()
@@ -234,6 +236,7 @@ def createARPReply(IP:int ,MAC:bytes) -> bytes:
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
+    logging.debug("[FUCN] createARPReply")
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = false
     request = bytes()
@@ -272,6 +275,7 @@ def process_arp_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:by
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = false
     # Extraer la cabecera comun de ARP
+    logging.debug("[FUCN] process_arp_frame")
     hw_type = struct.unpack('!H', data[HW_T_S:HW_T_E])[0]
     hw_size = struct.unpack('B', data[HW_S_I])[0]
     protocol_type = struct.unpack('!H', data[PR_T_S:PR_T_E])[0]
@@ -335,7 +339,6 @@ def initARP(interface:str) -> int:
             logging.error('[ERROR]: No se ha podido mandar la petición de ARP gratuito.')
             return -1
 
-
     NUMERIN_MAGIC_ALONSO = 0.2
     MAX_TRIES = 25
     num_tries = 0
@@ -395,21 +398,22 @@ def ARPResolution(ip:int) -> bytes:
     #NOTE: STATUS = Implemented
     #NOTE: TESTED = false
     with globalLock:
+        requestedIP = ip
         lcl_requestedIP = requestedIP
         lcl_awaiting_response = awaitingResponse
         lcl_resolved_MAC = resolvedMAC
 
+    if lcl_requestedIP == None:
+        logging.debug('[ERROR] requestedIP is None')
+
     with cacheLock:
-        mac_xd = cache.get(lcl_requestedIP, None)
-        if mac_xd != None:
-            return mac_xd
+        mac_cache = cache.get(lcl_requestedIP, None)
+        if mac_cache != None:
+            return mac_cache
 
     request = createARPRequest(lcl_requestedIP)
     for _ in range(3):# NOTE  28 = len(request)
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
-        if result == -1:
-            logging.error('[ERROR]: No se ha podido mandar la petición de ARP gratuito.')
-            return -1
 
         NUMERIN_MAGIC_ALONSO = 0.2
         MAX_TRIES = 15
