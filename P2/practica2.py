@@ -1,7 +1,8 @@
 '''
 	practica2.py
 	Programa principal que ejecuta resoluciones ARP. En este archivo No implementaremos nada.
-	Autor: Javier Ramos <javier.ramos@uam.es> / Manuel Ruiz <manuel.ruiz.fernandez@uam.es >
+    Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+             Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
 	2020 EPS-UAM
 '''
 
@@ -27,7 +28,6 @@ def printHelp():
 	print ( "\th : Muestra la ayuda\n")
 	print ( "\tq : Salir del programa\n")
 
-
 if __name__ == "__main__":
 	global pdumper,args,handle,el,stop
 	parser = argparse.ArgumentParser(description='Esta práctica ejecuta resoluciones ARP. Dada una dirección IP devuelve cual es la MAC asociada en la LAN actual',
@@ -45,8 +45,6 @@ if __name__ == "__main__":
 		logging.error('No se ha especificado interfaz')
 		parser.print_help()
 		sys.exit(-1)
-
-
 
 	#Inicializamos el nivel Ethernet en la interfaz especificada
 	if (startEthernetLevel(args.interface) != 0):

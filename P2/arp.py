@@ -1,7 +1,8 @@
 '''
     arp.py
     Implementación del protocolo ARP y funciones auxiliares que permiten realizar resoluciones de direcciones IP.
-    Autores: Javier Ramos <javier.ramos@uam.es>
+    Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+             Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
     2019 EPS-UAM
 '''
 import logging
@@ -34,7 +35,6 @@ awaitingResponse = False
 cacheLock = Lock()
 #Caché de ARP. Es un diccionario similar al estándar de Python solo que eliminará las entradas a los 10 segundos
 cache = ExpiringDict(max_len=100, max_age_seconds=10)
-
 
 # Indices para cabeceras de tramas ARP
 #   S : Start index
@@ -103,8 +103,6 @@ def printCache()->None:
                 print ('{:>12}\t\t{:>12}'.format(socket.inet_ntoa(struct.pack('!I',k)),':'.join(['{:02X}'.format(b) for b in cache[k]])))
 
 
-
-
 def processARPRequest(data:bytes,MAC:bytes)->None:
     '''
         Nombre: processARPRequest
@@ -123,11 +121,8 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
             -MAC: dirección MAC origen extraída por el nivel Ethernet
         Retorno: Ninguno
     '''
-    #NOTE: STATUS = Implemented
-    #NOTE: TESTED = False
     logging.debug("[FUNC] processARPRequest")
     mac_orig: bytes = data[SMAC_S:SMAC_E]
-    mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
     ip_orig: bytes  = struct.unpack('!I', data[SIP_S:SIP_E])[0]
     ip_dest: bytes  = struct.unpack('!I', data[TIP_S:TIP_E])[0]
 
@@ -166,22 +161,18 @@ def processARPReply(data:bytes,MAC:bytes)->None:
         Retorno: Ninguno
     '''
     global requestedIP,resolvedMAC,awaitingResponse,cache
-    #NOTE: STATUS = Implemented
-    #NOTE: TESTED = False
     global myIP, globalLock
-    logging.debug('[FUNC] processARPReply')
 
-    #dt.print_ARP_header(data)
+    logging.debug('[FUNC] processARPReply')
 
     mac_orig: bytes = data[SMAC_S:SMAC_E]
     mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
     ip_orig: bytes  = struct.unpack('!I', data[SIP_S:SIP_E])[0]
     ip_dest: bytes  = struct.unpack('!I', data[TIP_S:TIP_E])[0]
 
-
     if mac_orig != MAC:
         return
-
+    
     # Retornamos si el paquete no es para nosotros
     if ip_dest != myIP:
         return
@@ -209,9 +200,9 @@ def createARPRequest(ip:int) -> bytes:
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
-    logging.debug("[FUCN] createARPRequest")
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = false
+
+    logging.debug("[FUNC] createARPRequest")
+
     request = bytes()
     request += struct.pack('!H', HW_TYPE_ETHERNET)
     request += struct.pack('!H', PR_TYPE_IPV4)
@@ -224,7 +215,6 @@ def createARPRequest(ip:int) -> bytes:
     request += struct.pack('!I', ip)
 
     pt.print_ARP_header(request, 0)
-
 
     return request
 
@@ -239,9 +229,9 @@ def createARPReply(IP:int ,MAC:bytes) -> bytes:
         Retorno: Bytes con el contenido de la trama de petición ARP
     '''
     global myMAC,myIP
+
     logging.debug("[FUCN] createARPReply")
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = false
+
     request = bytes()
     request += struct.pack('!H', HW_TYPE_ETHERNET)
     request += struct.pack('!H', PR_TYPE_IPV4)
@@ -277,8 +267,6 @@ def process_arp_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:by
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = false
     # Extraer la cabecera comun de ARP
     logging.debug("[FUNC] process_arp_frame")
     hw_type = struct.unpack('!H', data[HW_T_S:HW_T_E])[0]
@@ -286,7 +274,6 @@ def process_arp_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:by
     protocol_type = struct.unpack('!H', data[PR_T_S:PR_T_E])[0]
     protocol_size = struct.unpack('B', data[PR_S_I:PR_S_I + 1])[0]
 
-    # NOTE: No tenemos ni idea de si se pueden hacer estas comparaciones con datos de tipo byte
     if  hw_type != HW_TYPE_ETHERNET or \
         protocol_type != PR_TYPE_IPV4 or \
         hw_size != ETHERNET_SIZE or \
@@ -305,8 +292,6 @@ def process_arp_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:by
         processARPReply(data, srcMac)
 
 
-
-
 def initARP(interface:str) -> int:
     '''
         Nombre: initARP
@@ -317,12 +302,11 @@ def initARP(interface:str) -> int:
             -Marcar la variable de nivel ARP inicializado a True
     '''
     global myIP,myMAC,arpInitialized, globalLock, requestedIP, awaitingResponse, resolvedMAC
+
     logging.debug('[FUNC] initARP')
+
     myIP  = getIP(interface)
     myMAC = getHwAddr(interface)
-
-    #NOTE: STATUS = Implemented
-    #NOTE: TESTED = false
     arpInitialized = False
 
     # Registramos al Ethertype 0x0806 (protocolo ARP) la funcion de procesamiento de un paquete
@@ -377,11 +361,9 @@ def initARP(interface:str) -> int:
         logging.error('Alguien más tiene mi dirección IP')
         return -1
 
-
     arpInitialized = True
 
     return 0
-
 
 
 def ARPResolution(ip:int) -> bytes:
@@ -404,10 +386,8 @@ def ARPResolution(ip:int) -> bytes:
             Como estas variables globales se leen y escriben concurrentemente deben ser protegidas con un Lock
     '''
     global requestedIP,awaitingResponse,resolvedMAC, cacheLock, cache, globalLock
-    logging.debug('[FUNC] ARPResolution')
-    #NOTE: STATUS = Implemented
-    #NOTE: TESTED = false
 
+    logging.debug('[FUNC] ARPResolution')
 
     if ip == None:
         logging.debug('[ERROR] requestedIP is None')
@@ -424,7 +404,7 @@ def ARPResolution(ip:int) -> bytes:
         awaitingResponse = True
         resolvedMAC = None
 
-    for i in range(3):# NOTE  28 = len(request)
+    for i in range(3):
         logging.debug(f'Iteracion ARPResolution {i}')
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
 
@@ -440,11 +420,15 @@ def ARPResolution(ip:int) -> bytes:
             if lcl_awaiting_response is True:
                 num_tries += 1
                 time.sleep(NUMERIN_MAGIC_ALONSO)
+
             else:
                 print(f"resolved mac {lcl_resolved_MAC}")
                 return lcl_resolved_MAC
+            
     logging.error('Se sale sin hacer la resolucion')
+
     with globalLock:
         logging.debug(f'awaitingResponse: {awaitingResponse}')
         logging.debug(f'requestedIP: {pt.IP_to_str(requestedIP)}')
+        
     return None

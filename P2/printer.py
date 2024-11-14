@@ -1,5 +1,12 @@
-import struct
+'''
+    printer.py
+    Funciones auxiliares para imprimir diversos datos referentes a la practica
+Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+             Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
 
+'''    
+
+import struct
 
 def MAC_to_str(mac: bytes) -> str:
     mac6 = struct.unpack('B', mac[0:1])[0]
@@ -19,7 +26,6 @@ def IP_to_str(ip: int) -> str:
     ip1 = (ip & 0xFF000000) >> 0x18
 
     return f'{ip1}.{ip2}.{ip3}.{ip4}'
-
 
 
 def print_ethernet_header(data: bytes, ident: int = 0):
@@ -48,4 +54,3 @@ def print_ARP_header(data: bytes, ident: int = 0):
 	print("\t"*ident, 'Orig IP:               ', IP_to_str(struct.unpack('!I', data[14:18])[0]))
 	print("\t"*ident, 'Dest MAC:              ', MAC_to_str(data[18:24]))
 	print("\t"*ident, 'Dest IP:               ', IP_to_str(struct.unpack('!I', data[24:28])[0]))
-

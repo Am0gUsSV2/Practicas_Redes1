@@ -1,7 +1,8 @@
 '''
     ethmsg.py
     Implementación del protocolo de mensajeria basica para emision de mensajes en tiempo real sobre ethernet.
-    Autor: Manuel Ruiz <manuel.ruiz.fernandez@uam.es>
+    Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+             Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
     2024 EPS-UAM
 '''
 
@@ -20,8 +21,6 @@ ETHTYPE = 0x3003
 broadcast = bytes([0xFF]*6)
 
 
-
-
 def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:bytes) -> None:
     '''
         Nombre: process_EthMsg_frame
@@ -38,15 +37,10 @@ def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = False
     logging.debug('[FUNC] process_ethMsg_frame')
-
     ip = struct.unpack('!I', data[0:4])[0]
     time_sec = header.ts.tv_sec
     time_usec = header.ts.tv_usec
-
-
     str_mac = pt.MAC_to_str(srcMac)
     str_ip  = pt.IP_to_str(ip)
 
@@ -63,8 +57,6 @@ def initEthMsg(interface:str) -> int:
         Argumentos:   
 			interfaz
     '''
-    # TODO : Check if it is needed to add more stuff
-    # NOTE : Not tested
     registerEthCallback(process_ethMsg_frame, ETHTYPE)
 
 
@@ -84,15 +76,10 @@ def sendEthMsg(ip:int, message: bytes) -> bytes:
 			Numero de Bytes transmitidos en el mensaje.
 			None en caso de que no haya podido emitir el mensaje 
     '''
-    # TODO: Control de errores
-    # TODO: check if ip es data[0:3] o data[0:4]
-    # NOTE: TESTED = False
     logging.debug('[FUNC] sendEthMsg')
     data = bytes()
     data += struct.pack('!I', ip)
     data += message
-
-
     destMac = ARPResolution(ip)
 
     if destMac is None:

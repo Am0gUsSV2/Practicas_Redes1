@@ -1,7 +1,8 @@
 '''
     ethernet.py
     Implementación del nivel Ethernet y funciones auxiliares para el envío y recepción de tramas Ethernet
-    Autor: Javier Ramos <javier.ramos@uam.es>
+    Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+             Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
     2019 EPS-UAM
 '''
 
@@ -24,8 +25,6 @@ TO_MS = 10
 broadcastAddr = bytes([0xFF]*6)
 #Diccionario que alamacena para un Ethertype dado qué función de callback se debe ejecutar
 EthernetProtocols = {}
-
-
 levelInitialized = False
 
 # Indices para cabeceras de tramas Ethernet
@@ -37,7 +36,6 @@ SETH_S = 6          # Target (dest) MAC
 SETH_E = 11+1
 ETHERTYPE_S = 12    # Ethertype
 ETHERTYPE_E = 13+1
-
 
 
 def getHwAddr(interface:str):
@@ -79,8 +77,6 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
         Retorno:
             -Ninguno
     '''
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = false
     global macAddress
 
     logging.debug('[FUNC] process_Ethernet_frame')
@@ -91,9 +87,6 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
     ethertype = struct.unpack('!H', data[ETHERTYPE_S:ETHERTYPE_E])[0]
 
     pt.print_ethernet_header(data, 0)
-    # myMAC = getHwAddr(str(ethertype))
-
-    #pt.print_ethernet_message(data, 0)
 
     # Comprobar si el paquete es para nosotros (incluye broadcast)
     if mac_dest != macAddress and mac_dest != broadcastAddr:
@@ -106,7 +99,6 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
         return
 
     callback(us, header, data[ETHERTYPE_E:], mac_orig)
-
     
 
 def process_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> None:
@@ -146,8 +138,6 @@ class rxThread(threading.Thread):
             pcap_breakloop(handle)
 
 
-
-
 def registerEthCallback(callback_func: Callable[[ctypes.c_void_p,pcap_pkthdr,bytes],None], ethertype:int) -> None:
     '''
         Nombre: registerCallback
@@ -169,9 +159,6 @@ def registerEthCallback(callback_func: Callable[[ctypes.c_void_p,pcap_pkthdr,byt
         Retorno: Ninguno 
     '''
     global EthernetProtocols
-    # NOTE: STATUS = Implemented
-    # NOTE: TESTED = false
-    #EthernetProtocols es el diccionario que relaciona función de callback y ethertype
     EthernetProtocols[ethertype] = callback_func
 
 
@@ -213,13 +200,9 @@ def startEthernetLevel(interface:str) -> int:
         logging.error(f'[ERROR] Fallo al abrir la interfaz: {errbuf.decode()}')
         return -1
 
-    #Una vez hemos abierto la interfaz para captura y hemos inicializado las variables globales (macAddress, handle y levelInitialized) arrancamos
-    #el hilo de recepción
     recvThread = rxThread()
     recvThread.daemon = True
     recvThread.start()
-
-
     levelInitialized = True
 
     return 0
@@ -238,8 +221,6 @@ def stopEthernetLevel()->int:
         Retorno: 0 si todo es correcto y -1 en otro caso
     '''
     logging.debug('[FUNC] stopEthernetLevel')
-    # NOTE: STATUS = Implementado
-    # NOTE: TESTED = false
     if levelInitialized is False:
         return 0
 
@@ -275,8 +256,6 @@ def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
     '''
     global macAddress,handle
     logging.debug('[FUNC] sendEthernetFrame')
-    # NOTE: STATUS = Implementado
-    # NOTE: TESTED = false
     # Construir trama Ethernet a enviar, con su cabecera
     frame_length = length + 14
     if frame_length > ETH_FRAME_MAX:
