@@ -339,19 +339,21 @@ def initARP(interface:str) -> int:
     # Indicar que esperamos una respuesta
     with globalLock:
         awaitingResponse = True
+        requestedIP = myIP
 
     # Enviar peticiones
     for _ in range(3):# NOTE  28 = len(request)
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
         if result == -1:
             logging.error('[ERROR]: No se ha podido mandar la petición de ARP gratuito.')
+            
             return -1
 
     NUMERIN_MAGIC_ALONSO = 0.2
     MAX_TRIES = 25
     num_tries = 0
 
-    # Esperar una respuesta. Maximo tiempo de espera: 5 segundoss
+    # Esperar una respuesta. Maximo tiempo de espera: 5 segundos
     while num_tries < MAX_TRIES:
         with globalLock:
             lcl_awaiting_response = awaitingResponse
@@ -359,7 +361,7 @@ def initARP(interface:str) -> int:
 
         # Si nos llega respuesta, entonces alguien más tiene nuestra IP
         if lcl_awaiting_response is False:
-            logging.error(f'El dispositivo {lcl_resolved_MAC} ya tiene mi dirección IP')
+            logging.error(f'El dispositivo {pt.MAC_to_str(lcl_resolved_MAC)} ya tiene mi dirección IP')
             return -1
 
         # Esperamos hasta volver a comprobar
