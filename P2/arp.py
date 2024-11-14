@@ -12,6 +12,7 @@ import time
 from threading import Lock
 from ethernet import *
 from expiringdict import ExpiringDict
+import printer as pt
 
 #Semáforo global
 globalLock =Lock()
@@ -59,7 +60,7 @@ TIP_E    = 27+1
 
 # Otras macros
 HW_TYPE_ETHERNET   = 0x0001   # Indica que las direcciones de nivel de enlace son de tipo Ethernet
-PR_TYPE_IPV4       = 0x8000   # Indica que el protocolo de nivel de red es IPv4
+PR_TYPE_IPV4       = 0x0800   # Indica que el protocolo de nivel de red es IPv4
 ETHERNET_SIZE      = 0x06        # Tamano de direcciones Ethernet
 IPV4_SIZE          = 0x04        # Tamano de direcciones IPv4
 OPCODE_ARP_REQUEST = 0x0001 # El tipo de mensaje ARP es Request
@@ -68,7 +69,6 @@ OPCODE_ARP_REPLY   = 0x0002 # El tipo de mensaje ARP es Reply
 ETHERTYPE_IP       =  0x0800      # Protocolo de nivel superior: IP
 ETHERTYPE_ARP      = 0x0806      # Protocolo de nivel superior: ARP
 
-import printer as pt
 
 def getIP(interface:str) -> int:
     '''
@@ -125,7 +125,7 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
     '''
     #NOTE: STATUS = Implemented
     #NOTE: TESTED = False
-    logging.debug("[FUCN] processARPRequest")
+    logging.debug("[FUNC] processARPRequest")
     mac_orig: bytes = data[SMAC_S:SMAC_E]
     mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
     ip_orig: bytes  = struct.unpack('!I', data[SIP_S:SIP_E])[0]
@@ -171,7 +171,7 @@ def processARPReply(data:bytes,MAC:bytes)->None:
     global myIP, globalLock
     logging.debug('[FUNC] processARPReply')
 
-    dt.print_ARP_reply(data)
+    #dt.print_ARP_header(data)
 
     mac_orig: bytes = data[SMAC_S:SMAC_E]
     mac_dest: bytes = data[TMAC_S:TMAC_E] #NOTE Not used
@@ -223,6 +223,9 @@ def createARPRequest(ip:int) -> bytes:
     request += broadcastAddr
     request += struct.pack('!I', ip)
 
+    pt.print_ARP_header(request, 0)
+
+
     return request
 
 
@@ -244,11 +247,13 @@ def createARPReply(IP:int ,MAC:bytes) -> bytes:
     request += struct.pack('!H', PR_TYPE_IPV4)
     request += struct.pack('!B', ETHERNET_SIZE)
     request += struct.pack('!B', IPV4_SIZE)
-    request += struct.pack('!H', OPCODE_ARP_REQUEST)
+    request += struct.pack('!H', OPCODE_ARP_REPLY)
     request += myMAC
     request += struct.pack('!I', myIP)
     request += MAC
     request += struct.pack('!I', IP)
+
+    pt.print_ARP_header(request, 0)
 
     return request
 
@@ -275,17 +280,20 @@ def process_arp_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac:by
     # NOTE: STATUS = Implemented
     # NOTE: TESTED = false
     # Extraer la cabecera comun de ARP
-    logging.debug("[FUCN] process_arp_frame")
+    logging.debug("[FUNC] process_arp_frame")
     hw_type = struct.unpack('!H', data[HW_T_S:HW_T_E])[0]
-    hw_size = struct.unpack('B', data[HW_S_I])[0]
+    hw_size = struct.unpack('B', data[HW_S_I:HW_S_I + 1])[0]
     protocol_type = struct.unpack('!H', data[PR_T_S:PR_T_E])[0]
-    protocol_size = struct.unpack('B', data[PR_S_I])[0]
+    protocol_size = struct.unpack('B', data[PR_S_I:PR_S_I + 1])[0]
 
     # NOTE: No tenemos ni idea de si se pueden hacer estas comparaciones con datos de tipo byte
     if  hw_type != HW_TYPE_ETHERNET or \
         protocol_type != PR_TYPE_IPV4 or \
         hw_size != ETHERNET_SIZE or \
         protocol_size != IPV4_SIZE:
+        logging.debug("Se sale del process_arp_frame sin hacer request ni reply")
+        pt.print_ARP_header(data, 0)
+
         return
 
     # Extraer opcode
@@ -351,7 +359,7 @@ def initARP(interface:str) -> int:
 
         # Si nos llega respuesta, entonces alguien más tiene nuestra IP
         if lcl_awaiting_response is False:
-            logging.error('Alguien más tiene mi dirección IP')
+            logging.error(f'El dispositivo {lcl_resolved_MAC} ya tiene mi dirección IP')
             return -1
 
         # Esperamos hasta volver a comprobar
@@ -397,26 +405,29 @@ def ARPResolution(ip:int) -> bytes:
     logging.debug('[FUNC] ARPResolution')
     #NOTE: STATUS = Implemented
     #NOTE: TESTED = false
-    with globalLock:
-        requestedIP = ip
-        lcl_requestedIP = requestedIP
-        lcl_awaiting_response = awaitingResponse
-        lcl_resolved_MAC = resolvedMAC
 
-    if lcl_requestedIP == None:
+
+    if ip == None:
         logging.debug('[ERROR] requestedIP is None')
 
     with cacheLock:
-        mac_cache = cache.get(lcl_requestedIP, None)
+        mac_cache = cache.get(ip, None)
         if mac_cache != None:
             return mac_cache
 
-    request = createARPRequest(lcl_requestedIP)
-    for _ in range(3):# NOTE  28 = len(request)
+    request = createARPRequest(ip)
+
+    with globalLock:
+        requestedIP = ip
+        awaitingResponse = True
+        resolvedMAC = None
+
+    for i in range(3):# NOTE  28 = len(request)
+        logging.debug(f'Iteracion ARPResolution {i}')
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
 
         NUMERIN_MAGIC_ALONSO = 0.2
-        MAX_TRIES = 15
+        MAX_TRIES = 25
         num_tries = 0
 
         while num_tries < MAX_TRIES:
@@ -428,6 +439,10 @@ def ARPResolution(ip:int) -> bytes:
                 num_tries += 1
                 time.sleep(NUMERIN_MAGIC_ALONSO)
             else:
+                print(f"resolved mac {lcl_resolved_MAC}")
                 return lcl_resolved_MAC
-
+    logging.error('Se sale sin hacer la resolucion')
+    with globalLock:
+        logging.debug(f'awaitingResponse: {awaitingResponse}')
+        logging.debug(f'requestedIP: {pt.IP_to_str(requestedIP)}')
     return None

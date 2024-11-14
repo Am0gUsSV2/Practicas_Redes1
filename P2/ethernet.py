@@ -93,7 +93,7 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
     pt.print_ethernet_header(data, 0)
     # myMAC = getHwAddr(str(ethertype))
 
-    pt.print_ethernet_message(data, 0)
+    #pt.print_ethernet_message(data, 0)
 
     # Comprobar si el paquete es para nosotros (incluye broadcast)
     if mac_dest != macAddress and mac_dest != broadcastAddr:
@@ -105,7 +105,7 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
         logging.debug(f'[DEBUG] Función callback para ethertype <{ethertype}> no encontrada.')
         return
 
-    callback(us, header, data[ETHERTYPE_E + 1:], mac_orig)
+    callback(us, header, data[ETHERTYPE_E:], mac_orig)
 
     
 
@@ -202,14 +202,15 @@ def startEthernetLevel(interface:str) -> int:
     macAddress = getHwAddr(interface)
 
     # Abrir la interfaz en modo promiscuo
+    errbuf = bytearray()
     try:
-        handle = pcap_open_live(device=interface, snaplen=ETH_FRAME_MAX, promisc=PROMISC, to_ms=TO_MS, errbuf=bytearray())
+        handle = pcap_open_live(device=interface, snaplen=ETH_FRAME_MAX, promisc=PROMISC, to_ms=TO_MS, errbuf=errbuf)
     except ValueError as e:
         logging.error(f'[ERROR] Fallo al abrir la interfaz: {e}')
         return -1
 
     if handle is None:
-        logging.error('[ERROR] Fallo al abrir la interfaz')
+        logging.error(f'[ERROR] Fallo al abrir la interfaz: {errbuf.decode()}')
         return -1
 
     #Una vez hemos abierto la interfaz para captura y hemos inicializado las variables globales (macAddress, handle y levelInitialized) arrancamos
@@ -281,6 +282,10 @@ def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
     if frame_length > ETH_FRAME_MAX:
         logging.error("[ERROR]: Data size too long for Ethernet frame!")
         return -1
+
+    if dstMac is None:
+        logging.error("[ERROR]: dstMac is None xd")
+        return -1  
 
     frame = bytes()
     frame += dstMac

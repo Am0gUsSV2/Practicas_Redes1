@@ -50,7 +50,9 @@ def process_ethMsg_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes,srcMac
     str_mac = pt.MAC_to_str(srcMac)
     str_ip  = pt.IP_to_str(ip)
 
-    print(f'[{time_sec}.{time_usec}] {str_mac} -> {str_ip}')
+    message = data[4:]
+
+    print(f'[{time_sec}.{time_usec}] {str_mac} -> {str_ip}: {message.decode()}')
 
 
 def initEthMsg(interface:str) -> int:
@@ -95,5 +97,6 @@ def sendEthMsg(ip:int, message: bytes) -> bytes:
 
     if destMac is None:
         logging.error("No se ha podido obtener la direccion mac dada la ip")
+        return None
 
     return sendEthernetFrame(data, len(data), ETHTYPE, destMac)
