@@ -15,6 +15,23 @@ ICMP_PROTO = 1
 ICMP_ECHO_REQUEST_TYPE = 8
 ICMP_ECHO_REPLY_TYPE = 0
 
+############################
+# INDICES DE CABECERA ICMP #
+############################
+#S = Start
+#E = End 
+ICMP_TYPE_S = 0 #1 byte
+ICMP_TYPE_E = 7
+ICMP_CODE_S = 8 #1 byte
+ICMP_CODE_E = 15
+ICMP_CHKSUM_S = 16 #2 bytes 
+ICMP_CHKSUM_E = 31
+ICMP_IDENTIFIER_S = 32 #2 bytes
+ICMP_IDENTIFIER_E = 47
+ICMP_SEQ_NUMBER_S = 48 #2 bytes
+ICMP_SEQ_NUMBER_S = 63
+#DATA...
+
 timeLock = Lock()
 icmp_send_times = {}
 

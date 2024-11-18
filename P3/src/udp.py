@@ -11,6 +11,21 @@ import struct
 UDP_HLEN = 8
 UDP_PROTO = 17
 
+###########################
+# INDICES DE CABECERA UDP #
+###########################
+#S = Start
+#E = End 
+SRC_PORT_S = 0 #2 bytes
+SRC_PORT_E = 15
+DST_PORT_S = 16 #2 bytes
+DST_PORT_E = 31 
+UDP_LENGTH_S = 32 #2 bytes
+UDP_LENGTH_E = 47
+UDP_CHKSUM_S = 48 #2 bytes
+UDP_CHKSUM_E = 63
+#DATA_OCTETS...
+
 def getUDPSourcePort():
     '''
         Nombre: getUDPSourcePort
@@ -67,6 +82,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
+     
     udp_datagram = bytes()
 
 

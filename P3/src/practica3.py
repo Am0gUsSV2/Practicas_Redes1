@@ -24,6 +24,7 @@ ICMP_ECHO_REQUEST_TYPE = 8
 ICMP_ECHO_REQUEST_CODE = 0
 # TODO: Cambiar ICMP_ID según enunciado
 ICMP_ID = 0
+LEN_ICMP_DATA = 12
 
 ipRROption = bytes([7,11,4,0,0,0,0,0,0,0,0,0])
 
@@ -34,9 +35,12 @@ if __name__ == "__main__":
 	parser.add_argument('--itf', dest='interface', default=False,help='Interfaz a abrir')
 	parser.add_argument('--dstIP',dest='dstIP',default = False,help='Dirección IP destino')
 	parser.add_argument('--debug', dest='debug', default=False, action='store_true',help='Activar Debug messages')
-	parser.add_argument('--addOptions', dest='addOptions', default=False, action='store_true',help='Añadir opciones a los datagranas IP')
+	parser.add_argument('--addOptions', dest='addOptions', default=False, action='store_true',help='Añadir opciones a los datagramas IP')
 	parser.add_argument('--dataFile',dest='dataFile',default = False,help='Fichero con datos a enviar')
 	#TODO: Opción --icmpsize
+	parser.add_argument('--icmpSize', dest="icmpSize", default = False, help='Tamanio del paquete ICMP request')
+	#NOTE: Status = Implemented
+	#NOTE: Test = Not tested
 	args = parser.parse_args()
 
 	if args.debug:
@@ -67,7 +71,16 @@ if __name__ == "__main__":
 			udp_data = data.encode()
 	
 	icmp_data = b'ABCDEFGHIJKL'
+
 	#TODO: construir mensaje ICMP según opción --icmpsize
+	if args.icmpSize < 1:
+		logging.error('El tamanio del paquete ICMP no puede ser menor que 1')
+		parser.print_help()
+		sys.exit(-1)
+	
+	icmp_data = (icmp_data*(args.icmpSize // LEN_ICMP_DATA) + 1)[:args.icmpSize]
+	#NOTE: Status = Implemented
+	#NOTE: Test = Not tested
 	
 	startEthernetLevel(args.interface)
 	initICMP()
@@ -75,8 +88,6 @@ if __name__ == "__main__":
 	if initIP(args.interface,ipOpts) == False:
 		logging.error('Inicializando nivel IP')
 		sys.exit(-1)
-
-	
 	
 	
 	while True:

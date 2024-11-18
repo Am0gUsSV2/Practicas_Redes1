@@ -18,6 +18,45 @@ protocols={}
 IP_MIN_HLEN = 20
 #Tamaño máximo de la cabecera IP
 IP_MAX_HLEN = 60
+
+
+##########################
+# INDICES DE CABECERA IP #
+##########################
+#S = Start
+#E = End 
+#Cabecera sin opciones = 20 bytes = 160 bits
+
+VERSION_S = 0 #4 bits
+VERSION_E = 3 
+IHL_S = 4 #4 bits
+IHL_E = 7
+TYPE_OF_SERVICE_S = 8 #1 byte
+TYPE_OF_SERVICE_E = 15 
+TOTAL_LENGTH_S = 16 #2 bytes
+TOTAL_LENGTH_E = 31
+IDENTIFICATION_S = 32 #2 bytes
+IDENTIFICATION_E = 47
+FLAGS_S = 48 #3 bits
+FLAGS_E = 50
+OFFSET_S = 51 #13 bits
+OFFSET_E = 63
+TIME_TO_LIVE_S = 64 #1 byte
+TIME_TO_LIVE_E = 71
+PROTOCOL_S = 72 #1 byte
+PROTOCOL_E = 79
+HEADER_CHKSUM_S = 80 #2 bytes
+HEADER_CHKSUM_E = 95
+IP_ORIG_S = 96 #4 bytes
+IP_ORIG_E = 127
+IP_DEST_S = 128 #4 bytes
+IP_DEST_E = 159
+OPTIONS_S = 160 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
+OPTIONS_E = 164
+
+MTU = 1500 #En bytes
+
+
 def chksum(msg):
     '''
         Nombre: chksum
