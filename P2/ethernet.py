@@ -86,16 +86,17 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
     mac_dest = data[TETH_S:TETH_E]
     ethertype = struct.unpack('!H', data[ETHERTYPE_S:ETHERTYPE_E])[0]
 
-    pt.print_ethernet_header(data, 0)
-
     # Comprobar si el paquete es para nosotros (incluye broadcast)
     if mac_dest != macAddress and mac_dest != broadcastAddr:
         return
 
+    if ethertype == 0x0806 or ethertype == 0x0800 or ethertype == 0x3003:
+        pt.print_ethernet_header(data)
+
     # Procesar la trama
     callback: Callable[[ctypes.c_void_p,pcap_pkthdr,bytes,bytes], None] = EthernetProtocols.get(ethertype, None)
     if callback is None:
-        logging.debug(f'[DEBUG] Función callback para ethertype <{ethertype}> no encontrada.')
+        logging.debug(f'Función callback para ethertype <{ethertype}> no encontrada.')
         return
 
     callback(us, header, data[ETHERTYPE_E:], mac_orig)
@@ -182,7 +183,7 @@ def startEthernetLevel(interface:str) -> int:
 
     # Check if ethernet level is already initialized
     if levelInitialized is True:
-        logging.error('[ERROR] La interfaz ya está inicializada')
+        logging.error('La interfaz ya está inicializada')
         return -1
 
     # Obetener la MAC asociada a la interfaz
@@ -193,11 +194,11 @@ def startEthernetLevel(interface:str) -> int:
     try:
         handle = pcap_open_live(device=interface, snaplen=ETH_FRAME_MAX, promisc=PROMISC, to_ms=TO_MS, errbuf=errbuf)
     except ValueError as e:
-        logging.error(f'[ERROR] Fallo al abrir la interfaz: {e}')
+        logging.error(f'Fallo al abrir la interfaz: {e}')
         return -1
 
     if handle is None:
-        logging.error(f'[ERROR] Fallo al abrir la interfaz: {errbuf.decode()}')
+        logging.error(f'Fallo al abrir la interfaz: {errbuf.decode()}')
         return -1
 
     recvThread = rxThread()
@@ -226,11 +227,11 @@ def stopEthernetLevel()->int:
 
     # Parar el hilo de recepcion de paquetes
     recvThread.stop()
-    logging.debug('[DEBUG] Hilo parado')
+    logging.debug('Hilo parado')
 
     # Cerrar la interfaz
     pcap_close(handle)
-    logging.debug('[DEBUG] Handle closed')
+    logging.debug('Handle closed')
 
     levelInitialized = False
 
@@ -259,12 +260,12 @@ def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
     # Construir trama Ethernet a enviar, con su cabecera
     frame_length = length + 14
     if frame_length > ETH_FRAME_MAX:
-        logging.error("[ERROR]: Data size too long for Ethernet frame!")
+        logging.error("Data size too long for Ethernet frame!")
         return -1
 
     if dstMac is None:
-        logging.error("[ERROR]: dstMac is None xd")
-        return -1  
+        logging.error("Dest MAC is None")
+        return -1
 
     frame = bytes()
     frame += dstMac
@@ -280,7 +281,7 @@ def sendEthernetFrame(data:bytes,length:int,etherType:int,dstMac:bytes) -> int:
     # Enviar la trama
     ret = pcap_inject(handle, frame, frame_length)
     if ret != frame_length:
-        logging.error('[ERROR]: Error en el envío de la trama')
+        logging.error('Error en el envío de la trama')
         return -1
 
     return 0

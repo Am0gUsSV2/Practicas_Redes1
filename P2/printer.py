@@ -1,7 +1,7 @@
 '''
     printer.py
     Funciones auxiliares para imprimir diversos datos referentes a la practica
-Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
+	Autores: Pablo Tejero Lascorz, pablo.tejerol@estudiante.uam.es
              Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
 
 '''    
@@ -34,12 +34,6 @@ def print_ethernet_header(data: bytes, ident: int = 0):
 	print("\t"*ident, 'Dest MAC:  ', MAC_to_str(data[0:6]))
 	print("\t"*ident, 'Orig MAC:  ', MAC_to_str(data[6:12]))
 	print("\t"*ident, 'Ethertype: ', f'{ struct.unpack("!H", data[12:14])[0] :04x}')
-
-
-def print_ethernet_message(data: bytes, ident: int = 0):
-	print("\t"*ident, 'MESSAGE:')
-	ident += 1
-	print("\t"*ident, f'[{data[18:].decode()}]')
 
 
 def print_ARP_header(data: bytes, ident: int = 0):

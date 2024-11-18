@@ -1,0 +1,137 @@
+================================================
+PRACTICA 2
+================================================
+
+El programa construye el nivel de enlace. Se implementa el protocolo Ethernet y el protocolo ARP.
+
+Autores: Roberto Martín Alonso, Pablo Tejero Lascorz
+Grupo: 1313
+Pareja: 03
+
+
+------------------------------------------
+Contenido
+------------------------------------------
+
+    > arp.py: Implementa el protocolo ARP
+    > ethernet.py: Implementa el protocolo Ethernet
+    > ethmsg.py: Contiene métodos para enviar y procesar mensajes siguiendo el protocolo Ethernet
+    > practica2.py: Punto de entrada al programa, ofrece una interfaz por línea de comandos para
+          probar las distintas funcionalidades del programa.
+    > printer.py: Contiene métodos de impresión de direcciones MAC e IP y cabeceras Ethernet y ARP.
+    > rc1_pcap.py: Wrapper en Python para la librería libpcap.
+
+
+
+------------------------------------------
+Requisitos
+------------------------------------------
+
+    Sistema Operativo: Lubuntu
+    Otras Dependencias: libpcap.so
+                        mininet
+
+
+------------------------------------------
+Instrucciones de uso
+------------------------------------------
+
+    Para poder probar el funcionamiento del programa utilizaremos la herramienta mininet, que creará
+    dos hosts con una dirección MAC e IP propia. Ejecutamos los siguientes comandos para arrancarlo:
+
+        sudo systemctl stop network-manager
+        sudo mn --nat
+
+    Una vez inicializado mininet abriremos una terminal para cada host. Para ello, basta con escribir
+    en la terminal:
+
+        gterm h1
+        gterm h2
+
+    Para ejecutar cada programa:
+
+        python3 practica2.py --itf <INTERFACE> [--debug]
+
+    El programa recibirá los siguientes parámetros:
+      --itf    : Nombre de la interfaz en vivo de la que capturar paquetes 
+      --debug  : Opcional, para mostrar mensajes de depuración
+
+    El programa proporcionará una interfaz por línea de comandos (CLI) que el usuario utilizará para
+    poder hacer distintas operaciones. La CLI se habilitará una vez el programa haya efectuado la
+    inicialización del nivel ARP. Los comandos son:
+
+        a <direccion-IP>           : Petición ARP a partir de la dirección IP
+        g                          : Petición ARP gratuito para identificar duplicidad de direcciones IP
+        h                          : Imprime mensaje de ayuda
+        m <direccion-IP> <mensaje> : Envía un mensaje en broadcast sobre el protocolo 0x3003
+        p                          : Imprime la tabla ARP
+        q                          : Sale del programa liberando los recursos
+
+
+
+
+------------------------------------------
+Análisis de criterios de evaluación
+------------------------------------------
+
+    [1] Normativa de entrega cumplida en su totalidad
+        STATUS : Realizado
+        NOTAS  : Varias relecturas del enunciado y revisión de los archivos y el zip entregados.
+
+    [2] Contar paquetes de una traza
+        STATUS : Realizado
+        NOTAS  : Se ha comprobado que el número de paquetes coincide con los de Wireshark (si la traza
+                 proviene de allí) o con los que habíamos capturado previamente (si la traza la creamos
+                 nosotros al capturar de una interfaz).
+
+    [3] Recibir tramas Ethernet, realizar comprobaciones y llamar correctamente a la función de callback
+        de nivel superior
+        STATUS : Realizado
+        NOTAS  : Se reciben adecuadamente las tramas y se procesan cuando es debido. Se asignan funciones
+                 callback correctamente y se llaman para los paquetes recibidos con el Ethertype correspondiente.
+
+    [4] Enviar tramas Ethernet correctamente
+        STATUS : Realizado
+        NOTAS  : Se ha revisado que las cabeceras se forman y añaden a los datos adecuadamente. También se
+                 ha corroborado entre los dos hosts utilizados en las pruebas que las tramas (cabecera y
+                 datos) enviadas por uno son idénticas a las recibidas por el otro.
+
+    [5] Imprimir mensajes sobre el protocolo 0x3003
+        STATUS : Realizado
+        NOTAS  : Se imprimen adecuadamente el tiempo de recepción del paquete, las direcciones MAC e IP del
+                 emisor (con el formato adecuado) y el mensaje en sí.
+
+    [6] Enviar correctamente peticiones ARP
+        STATUS : Realizado
+        NOTAS  : Se ha verificado la correctitud de los datos de la cabecera y que la petición se envíe en
+                 broadcast.
+
+    [7] Procesar correctamente peticiones ARP recibidas
+        STATUS : Realizado
+        NOTAS  : El programa es capaz de distinguir entre peticiones ARP Request y ARP Reply. Procesa las
+                 ARP Reply únicamente si había hecho una Request anteriormente.
+
+    [8] Enviar correctamente respuestas ARP
+        STATUS : Realizado
+        NOTAS  : Reenvía al emisor su dirección MAC e IP siempre que la dirección IP coincida con la propia.
+
+    [9] Procesar correctamente respuestas ARP
+        STATUS : Realizado
+        NOTAS  : Procesa las respuestas solo si había hecho una Request. No se han detectado errores en el 
+                 control de las variables globales y el uso de semáforo mutex que las protege.
+
+    [10] Manejo correcto de la caché ARP
+        STATUS : Realizado
+        NOTAS  : Se guarda un par IP-MAC cada vez que realiza resolución sobre una dirección MAC. Si la 
+                 dirección MAC asociada a una dirección IP está en la caché, se evita hacer una resolución 
+                 ARP.
+
+    [11] Uso correcto de Locks
+        STATUS : Realizado
+        NOTAS  : No se han detectado problemas de interbloqueo y las variables globales se actualizan
+                 adecuadamente.
+
+    [12] Realiza correctamente el ARP Gratuito
+        STATUS : Realizado
+        NOTAS  : Se ha comprobado que es capaz de identificar correctamente cuándo otro host comparte la
+                 dirección IP.

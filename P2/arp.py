@@ -172,7 +172,7 @@ def processARPReply(data:bytes,MAC:bytes)->None:
 
     if mac_orig != MAC:
         return
-    
+
     # Retornamos si el paquete no es para nosotros
     if ip_dest != myIP:
         return
@@ -188,7 +188,7 @@ def processARPReply(data:bytes,MAC:bytes)->None:
 
     # Almacenar en la cache el par IP/MAC
     with cacheLock:
-        cache[ip_orig] = mac_orig      
+        cache[ip_orig] = mac_orig
 
 
 def createARPRequest(ip:int) -> bytes:
@@ -318,7 +318,6 @@ def initARP(interface:str) -> int:
 
     # Realizar peticiones ARP gratuito para comprobar si nuestra IP ya esta asignada
     request = createARPRequest(myIP)
-    logging.debug(f'Request: [{request}]')
 
     # Indicar que esperamos una respuesta
     with globalLock:
@@ -326,12 +325,10 @@ def initARP(interface:str) -> int:
         requestedIP = myIP
 
     # Enviar peticiones
-    for _ in range(3):# NOTE  28 = len(request)
+    for _ in range(3):
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
         if result == -1:
-            logging.error('[ERROR]: No se ha podido mandar la petición de ARP gratuito.')
-            
-            return -1
+            logging.error('No se ha podido mandar la petición de ARP gratuito.')
 
     NUMERIN_MAGIC_ALONSO = 0.2
     MAX_TRIES = 25
@@ -389,8 +386,8 @@ def ARPResolution(ip:int) -> bytes:
 
     logging.debug('[FUNC] ARPResolution')
 
-    if ip == None:
-        logging.debug('[ERROR] requestedIP is None')
+    if ip is None:
+        logging.debug('requestedIP is None')
 
     with cacheLock:
         mac_cache = cache.get(ip, None)
@@ -404,31 +401,30 @@ def ARPResolution(ip:int) -> bytes:
         awaitingResponse = True
         resolvedMAC = None
 
-    for i in range(3):
-        logging.debug(f'Iteracion ARPResolution {i}')
+    for _ in range(3):
         result = sendEthernetFrame(request, len(request), ETHERTYPE_ARP, broadcastAddr)
+        if result == -1:
+            logging.error('No se ha podido mandar la petición de ARP gratuito.')
 
         NUMERIN_MAGIC_ALONSO = 0.2
         MAX_TRIES = 25
         num_tries = 0
 
+        # Esperar una respuesta. Maximo tiempo de espera: 5 segundos
         while num_tries < MAX_TRIES:
             with globalLock:
                 lcl_awaiting_response = awaitingResponse
                 lcl_resolved_MAC = resolvedMAC
 
-            if lcl_awaiting_response is True:
-                num_tries += 1
-                time.sleep(NUMERIN_MAGIC_ALONSO)
+            # Si encontramos la MAC, insertamos en el diccionario
+            if lcl_awaiting_response is False:
+                with cacheLock:
+                    cache[ip] = lcl_resolved_MAC
 
-            else:
-                print(f"resolved mac {lcl_resolved_MAC}")
                 return lcl_resolved_MAC
-            
-    logging.error('Se sale sin hacer la resolucion')
 
-    with globalLock:
-        logging.debug(f'awaitingResponse: {awaitingResponse}')
-        logging.debug(f'requestedIP: {pt.IP_to_str(requestedIP)}')
-        
+
+            num_tries += 1
+            time.sleep(NUMERIN_MAGIC_ALONSO)
+
     return None

@@ -80,10 +80,5 @@ def sendEthMsg(ip:int, message: bytes) -> bytes:
     data = bytes()
     data += struct.pack('!I', ip)
     data += message
-    destMac = ARPResolution(ip)
 
-    if destMac is None:
-        logging.error("No se ha podido obtener la direccion mac dada la ip")
-        return None
-
-    return sendEthernetFrame(data, len(data), ETHTYPE, destMac)
+    return sendEthernetFrame(data, len(data), ETHTYPE, broadcast)
