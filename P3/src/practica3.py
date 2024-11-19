@@ -22,9 +22,9 @@ import socket
 DST_PORT = 53
 ICMP_ECHO_REQUEST_TYPE = 8
 ICMP_ECHO_REQUEST_CODE = 0
-# TODO: Cambiar ICMP_ID según enunciado
-ICMP_ID = 0
-LEN_ICMP_DATA = 12
+# TODO: Cambiar ICMP_ID según enunciado: es el numero de pareja
+ICMP_ID = 3
+LEN_ICMP_DATA = 26
 
 ipRROption = bytes([7,11,4,0,0,0,0,0,0,0,0,0])
 
@@ -69,27 +69,27 @@ if __name__ == "__main__":
 			data=f.read()
 			#Pasamos los datos de cadena a bytes
 			udp_data = data.encode()
-	
-	icmp_data = b'ABCDEFGHIJKL'
+
+	icmp_data = b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 	#TODO: construir mensaje ICMP según opción --icmpsize
 	if args.icmpSize < 1:
 		logging.error('El tamanio del paquete ICMP no puede ser menor que 1')
 		parser.print_help()
 		sys.exit(-1)
-	
+
 	icmp_data = (icmp_data*(args.icmpSize // LEN_ICMP_DATA) + 1)[:args.icmpSize]
 	#NOTE: Status = Implemented
 	#NOTE: Test = Not tested
-	
+
 	startEthernetLevel(args.interface)
 	initICMP()
 	initUDP()
 	if initIP(args.interface,ipOpts) == False:
 		logging.error('Inicializando nivel IP')
 		sys.exit(-1)
-	
-	
+
+
 	while True:
 		try:
 			msg = input('\n\t0x16\n\tIntroduzca opcion:\n\t1.Enviar ping\n\t2.Enviar datagrama UDP:')

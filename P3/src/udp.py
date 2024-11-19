@@ -17,13 +17,13 @@ UDP_PROTO = 17
 #S = Start
 #E = End 
 SRC_PORT_S = 0 #2 bytes
-SRC_PORT_E = 15
+SRC_PORT_E = 15 + 1
 DST_PORT_S = 16 #2 bytes
-DST_PORT_E = 31 
+DST_PORT_E = 31 + 1
 UDP_LENGTH_S = 32 #2 bytes
-UDP_LENGTH_E = 47
+UDP_LENGTH_E = 47 + 1
 UDP_CHKSUM_S = 48 #2 bytes
-UDP_CHKSUM_E = 63
+UDP_CHKSUM_E = 63 + 1
 #DATA_OCTETS...
 
 def getUDPSourcePort():

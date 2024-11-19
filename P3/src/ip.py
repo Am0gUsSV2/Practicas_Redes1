@@ -20,39 +20,39 @@ IP_MIN_HLEN = 20
 IP_MAX_HLEN = 60
 
 
-##########################
-# INDICES DE CABECERA IP #
-##########################
-#S = Start
-#E = End 
+# ====================================#
+# INDICES DE CABECERA IP              #
+# ====================================#
+#   S = Start
+#   E = End 
 #Cabecera sin opciones = 20 bytes = 160 bits
 
 VERSION_S = 0 #4 bits
-VERSION_E = 3 
+VERSION_E = 3+1
 IHL_S = 4 #4 bits
-IHL_E = 7
+IHL_E = 7+1
 TYPE_OF_SERVICE_S = 8 #1 byte
-TYPE_OF_SERVICE_E = 15 
+TYPE_OF_SERVICE_E = 15+1 
 TOTAL_LENGTH_S = 16 #2 bytes
-TOTAL_LENGTH_E = 31
+TOTAL_LENGTH_E = 31 + 1
 IDENTIFICATION_S = 32 #2 bytes
-IDENTIFICATION_E = 47
+IDENTIFICATION_E = 47 + 1
 FLAGS_S = 48 #3 bits
-FLAGS_E = 50
+FLAGS_E = 50 + 1
 OFFSET_S = 51 #13 bits
-OFFSET_E = 63
+OFFSET_E = 63 + 1
 TIME_TO_LIVE_S = 64 #1 byte
-TIME_TO_LIVE_E = 71
+TIME_TO_LIVE_E = 71 + 1
 PROTOCOL_S = 72 #1 byte
-PROTOCOL_E = 79
+PROTOCOL_E = 79 + 1
 HEADER_CHKSUM_S = 80 #2 bytes
-HEADER_CHKSUM_E = 95
+HEADER_CHKSUM_E = 95 + 1
 IP_ORIG_S = 96 #4 bytes
-IP_ORIG_E = 127
+IP_ORIG_E = 127 + 1
 IP_DEST_S = 128 #4 bytes
-IP_DEST_E = 159
+IP_DEST_E = 159 + 1
 OPTIONS_S = 160 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
-OPTIONS_E = 164
+OPTIONS_E = 164 + 1
 
 MTU = 1500 #En bytes
 
@@ -139,7 +139,7 @@ def process_IP_datagram(us,header,data,srcMac):
             Esta función debe realizar, al menos, las siguientes tareas:
                 -Extraer los campos de la cabecera IP (includa la longitud de la cabecera)
                 -Calcular el checksum y comprobar que es correcto                    
-                -Analizar los bits de de MF y el offset. Si el offset tiene un valor != 0 dejar de procesar el datagrama (no vamos a reensamblar)
+                -Analizar los bits de MF y el offset. Si el offset tiene un valor != 0 dejar de procesar el datagrama (no vamos a reensamblar)
                 -Loggear (usando logging.debug) el valor de los siguientes campos:
                     -Longitud de la cabecera IP
                     -IPID
@@ -150,7 +150,7 @@ def process_IP_datagram(us,header,data,srcMac):
                     -Protocolo
                 -Comprobar si tenemos registrada una función de callback de nivel superior consultando el diccionario protocols y usando como
                 clave el valor del campo protocolo del datagrama IP.
-                    -En caso de que haya una función de nivel superior registrada, debe llamarse a dicha funciñón 
+                    -En caso de que haya una función de nivel superior registrada, debe llamarse a dicha función 
                     pasando los datos (payload) contenidos en el datagrama IP.
         
         Argumentos:
@@ -160,7 +160,53 @@ def process_IP_datagram(us,header,data,srcMac):
             -srcMac: MAC origen de la trama Ethernet que se ha recibido
         Retorno: Ninguno
     '''
+    # NOTE: STATUS = Implemented
+    ip_version = (data[0] & 0b11110000) >> 4
+    ihl        = (data[0] & 0b00001111) >> 0
+    typeof_service = data[1]
+    total_length = struct.unpack('!H', data[2:4])
+    ipid = struct.unpack('!H', data[4:6])
+    flag_reserved = (data[6] & 0b10000000) >> 7
+    flag_df       = (data[6] & 0b01000000) >> 6
+    flag_mf       = (data[6] & 0b00100000) >> 5
 
+
+    offset = struct.unpack('!H', data[6:8])[0] & 0x1FFF
+    time_to_live = data[8]
+    protocol = data[9]
+    checksum = struct.unpack('!H', data[10:12])[0]
+    src_ip  = struct.unpack('!I', data[12:16])[0]
+    dest_ip = struct.unpack('!I', data[16:20])[0]
+
+    # Calcular datos reales
+    ihl *= 4
+    offset *= 8
+
+    # NOTE: Maybe we gotta do smth about options, probably not
+
+    # Si el checksum no es correcto se descarta el paquete
+    if checksum != chksum(data[0:ihl]):
+        return
+
+    # Si hay más fragmentos, devolver (no reensamblamos)
+    if offset != 0:
+        return
+
+    logging.debug(f'Trama IP recibida:')
+    logging.debug(f'   - Header length: {ihl}')
+    logging.debug(f'   - IP ID:         {ipid}')
+    logging.debug(f'   - Total length:  {total_length}')
+    logging.debug(f'   - Flag DF:       {flag_df}')
+    logging.debug(f'   - Flag MF:       {flag_mf}')
+    logging.debug(f'   - Offset:        {offset}')
+    logging.debug(f'   - Source IP:     {src_ip}')
+    logging.debug(f'   - Dest IP:       {dest_ip}')
+    logging.debug(f'   - Protocol:      {protocol}')
+
+
+    callback = protocols.get(protocol, None)
+    if callback is not None:
+        callback(data[60:])
 
 
 
@@ -186,6 +232,9 @@ def registerIPProtocol(callback,protocol):
             -protocol: valor del campo protocolo de IP para el cuál se quiere registrar una función de callback.
         Retorno: Ninguno 
     '''
+    # NOTE: STATUS = Implemented
+    protocols[protocol] = callback
+
 
 def initIP(interface,opts=None):
     global myIP, MTU, netmask, defaultGW,ipOpts
@@ -206,6 +255,20 @@ def initIP(interface,opts=None):
             -opts: array de bytes con las opciones a nivel IP a incluir en los datagramas o None si no hay opciones a añadir
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
+    global ipOpts # Definido por nosotros
+    ret = initARP(interface)
+    if ret != 0:
+        return ret
+
+    ip = getIP(interface)
+    mtu = getMTU(interface)
+    netmask = getNetmask(interface)
+    gateway = getDefaultGW(interface)
+
+    # TODO: Almacenar en variables globales
+
+    ipOpts = opts
+
 
 def sendIPDatagram(dstIP,data,protocol):
     global IPID

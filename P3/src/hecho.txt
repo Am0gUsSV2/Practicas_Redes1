@@ -1,3 +1,0 @@
-18 Noviembre
-    -Se crean los indices de las cabeceras ICMP, IP y UDP
-    -Se completa el programa practica3.py con el argumento --icmpSize y rellenando el campo de datos segun la dimension que se le pase por argumento
