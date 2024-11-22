@@ -54,7 +54,9 @@ IP_DEST_E = 159 + 1
 OPTIONS_S = 160 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
 OPTIONS_E = 164 + 1
 
-MTU = 1500 #En bytes
+DEF_MTU = 1500 #En bytes
+LONG_HEADER_IP = 20
+
 
 
 def chksum(msg):
@@ -237,7 +239,7 @@ def registerIPProtocol(callback,protocol):
 
 
 def initIP(interface,opts=None):
-    global myIP, MTU, netmask, defaultGW,ipOpts
+    global myIP, MTU, netmask, defaultGW,ipOpts,IPID
     '''
         Nombre: initIP
         Descripción: Esta función inicializará el nivel IP. Esta función debe realizar, al menos, las siguientes tareas:
@@ -255,19 +257,18 @@ def initIP(interface,opts=None):
             -opts: array de bytes con las opciones a nivel IP a incluir en los datagramas o None si no hay opciones a añadir
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
-    global ipOpts # Definido por nosotros
+    #NOTE: STATUS = Implemented, TEST = Not tested
     ret = initARP(interface)
     if ret != 0:
         return ret
-
-    ip = getIP(interface)
-    mtu = getMTU(interface)
-    netmask = getNetmask(interface)
-    gateway = getDefaultGW(interface)
-
     # TODO: Almacenar en variables globales
-
+    myIP = getIP(interface)
+    MTU = getMTU(interface)
+    netmask = getNetmask(interface)
+    defaultGW = getDefaultGW(interface)
     ipOpts = opts
+    registerEthCallback(process_IP_datagram, 0x0800)
+    IPID = 3 #NOTE: no se si el numero de pareja se pone asi
 
 
 def sendIPDatagram(dstIP,data,protocol):
@@ -284,7 +285,7 @@ def sendIPDatagram(dstIP,data,protocol):
                 -Añadir los datos a la cabecera IP
                 -En el caso de que sea un fragmento ajustar los valores de los campos MF y offset de manera adecuada
                 -Enviar el datagrama o fragmento llamando a sendEthernetFrame. Para determinar la dirección MAC de destino
-                al enviar los datagramas se debe hacer unso de la máscara de red:                  
+                al enviar los datagramas se debe hacer uso de la máscara de red:                  
             -Para cada datagrama (no fragmento):
                 -Incrementar la variable IPID en 1.
         Argumentos:
@@ -295,7 +296,14 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
+    #NOTE: STATUS : Implementing...
     ip_header = bytes()
-
-
-
+    if dstIP is None:
+        logging.error("Dest IP is None")
+        return False
+    data_len = len(data)
+    long_util_data = MTU - LONG_HEADER_IP
+    if data_len > long_util_data:
+        if (long_util_data % 8): #Se comprueba si los datos utiles son multiplos de 8
+            long_util_data = long_util_data - long_util_data % 8 #Si no son multiplos se hace que el valor maximo de datos utiles si lo sea
+        n_fragments = data_len / long_util_data
