@@ -20,41 +20,36 @@ IP_MIN_HLEN = 20
 IP_MAX_HLEN = 60
 
 
-# ====================================#
-# INDICES DE CABECERA IP              #
-# ====================================#
+#======================================#
+# INDICES DE CABECERA IP               #
+#======================================#
 #   S = Start
-#   E = End 
-#Cabecera sin opciones = 20 bytes = 160 bits
+#   E = End
+#   I = Index
+# Cabecera sin opciones = 20 bytes = 160 bits
 
-VERSION_S = 0 #4 bits
-VERSION_E = 3+1
-IHL_S = 4 #4 bits
-IHL_E = 7+1
-TYPE_OF_SERVICE_S = 8 #1 byte
-TYPE_OF_SERVICE_E = 15+1 
-TOTAL_LENGTH_S = 16 #2 bytes
-TOTAL_LENGTH_E = 31 + 1
-IDENTIFICATION_S = 32 #2 bytes
-IDENTIFICATION_E = 47 + 1
-FLAGS_S = 48 #3 bits
-FLAGS_E = 50 + 1
-OFFSET_S = 51 #13 bits
-OFFSET_E = 63 + 1
-TIME_TO_LIVE_S = 64 #1 byte
-TIME_TO_LIVE_E = 71 + 1
-PROTOCOL_S = 72 #1 byte
-PROTOCOL_E = 79 + 1
-HEADER_CHKSUM_S = 80 #2 bytes
-HEADER_CHKSUM_E = 95 + 1
-IP_ORIG_S = 96 #4 bytes
-IP_ORIG_E = 127 + 1
-IP_DEST_S = 128 #4 bytes
-IP_DEST_E = 159 + 1
-OPTIONS_S = 160 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
-OPTIONS_E = 164 + 1
+VERSION_AND_IHL_I = 0 #4 bits
+TYPE_OF_SERVICE_S = 1 #1 byte
+TYPE_OF_SERVICE_E = 1+1
+TOTAL_LENGTH_S = 2 #2 bytes
+TOTAL_LENGTH_E = 3+1
+IPID_S = 4 #2 bytes
+IPID_E = 5+1
+FLAGS_I = 6 #3 bits
+OFFSET_S = 6 #13 bits
+OFFSET_E = 6+2
+TIME_TO_LIVE_I = 8 #1 byte
+PROTOCOL_I = 9 #1 byte
+CHECKSUM_S = 10 #2 bytes
+CHECKSUM_E = 11+1
+IP_ORIG_S = 12 #4 bytes
+IP_ORIG_E = 15+1
+IP_DEST_S = 16 #4 bytes
+IP_DEST_E = 19+1
+OPTIONS_S = 20 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
 
-DEF_MTU = 1500 #En bytes
+
+DEF_MTU = 1500 # En bytes
 LONG_HEADER_IP = 20
 
 
@@ -163,22 +158,22 @@ def process_IP_datagram(us,header,data,srcMac):
         Retorno: Ninguno
     '''
     # NOTE: STATUS = Implemented
-    ip_version = (data[0] & 0b11110000) >> 4
-    ihl        = (data[0] & 0b00001111) >> 0
+    ip_version = (data[VERSION_AND_IHL_I] & 0b11110000) >> 4
+    ihl        = (data[VERSION_AND_IHL_I] & 0b00001111) >> 0
     typeof_service = data[1]
     total_length = struct.unpack('!H', data[2:4])
     ipid = struct.unpack('!H', data[4:6])
-    flag_reserved = (data[6] & 0b10000000) >> 7
-    flag_df       = (data[6] & 0b01000000) >> 6
-    flag_mf       = (data[6] & 0b00100000) >> 5
+    flag_reserved = (data[FLAGS_I] & 0b10000000) >> 7
+    flag_df       = (data[FLAGS_I] & 0b01000000) >> 6
+    flag_mf       = (data[FLAGS_I] & 0b00100000) >> 5
 
 
-    offset = struct.unpack('!H', data[6:8])[0] & 0x1FFF
-    time_to_live = data[8]
-    protocol = data[9]
-    checksum = struct.unpack('!H', data[10:12])[0]
-    src_ip  = struct.unpack('!I', data[12:16])[0]
-    dest_ip = struct.unpack('!I', data[16:20])[0]
+    offset = struct.unpack('!H', data[OFFSET_S:OFFSET_E])[0] & 0x1FFF
+    time_to_live = data[TIME_TO_LIVE_I]
+    protocol = data[PROTOCOL_I]
+    checksum = struct.unpack('!H', data[CHECKSUM_S:CHECKSUM_E])[0]
+    src_ip  = struct.unpack('!I', data[IP_ORIG_S:IP_ORIG_E])[0]
+    dest_ip = struct.unpack('!I', data[IP_DEST_S:IP_DEST_E])[0]
 
     # Calcular datos reales
     ihl *= 4
@@ -194,7 +189,7 @@ def process_IP_datagram(us,header,data,srcMac):
     if offset != 0:
         return
 
-    logging.debug(f'Trama IP recibida:')
+    logging.debug( 'Trama IP recibida:')
     logging.debug(f'   - Header length: {ihl}')
     logging.debug(f'   - IP ID:         {ipid}')
     logging.debug(f'   - Total length:  {total_length}')
@@ -239,7 +234,6 @@ def registerIPProtocol(callback,protocol):
 
 
 def initIP(interface,opts=None):
-    global myIP, MTU, netmask, defaultGW,ipOpts,IPID
     '''
         Nombre: initIP
         Descripción: Esta función inicializará el nivel IP. Esta función debe realizar, al menos, las siguientes tareas:
@@ -258,17 +252,22 @@ def initIP(interface,opts=None):
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
     #NOTE: STATUS = Implemented, TEST = Not tested
+    global myIP, myMtu, netmask, defaultGW,ipOpts,IPID
+
     ret = initARP(interface)
     if ret != 0:
-        return ret
+        return False
+
     # TODO: Almacenar en variables globales
     myIP = getIP(interface)
-    MTU = getMTU(interface)
+    myMtu = getMTU(interface)
     netmask = getNetmask(interface)
     defaultGW = getDefaultGW(interface)
     ipOpts = opts
     registerEthCallback(process_IP_datagram, 0x0800)
-    IPID = 3 #NOTE: no se si el numero de pareja se pone asi
+    IPID = 3 # NOTE: no se si el numero de pareja se pone asi
+
+    return True
 
 
 def sendIPDatagram(dstIP,data,protocol):
@@ -297,13 +296,64 @@ def sendIPDatagram(dstIP,data,protocol):
           
     '''
     #NOTE: STATUS : Implementing...
-    ip_header = bytes()
     if dstIP is None:
         logging.error("Dest IP is None")
         return False
+
+    # Determinar si se debe fragmentar
     data_len = len(data)
-    long_util_data = MTU - LONG_HEADER_IP
+    long_util_data = myMtu - LONG_HEADER_IP
+
+    n_comp_fragments = 0    # Numero de fragmentos con longitud maxima
+    n_part_fragments = 0    # Numero de fragmentos sin longitud maxima
+
+    # Determinar si se partir los datos en varios fragmentos
     if data_len > long_util_data:
-        if (long_util_data % 8): #Se comprueba si los datos utiles son multiplos de 8
-            long_util_data = long_util_data - long_util_data % 8 #Si no son multiplos se hace que el valor maximo de datos utiles si lo sea
-        n_fragments = data_len / long_util_data
+        # Si la longitud de los datos utiles no es multiplo de 8 se hace que si lo sea
+        if (long_util_data % 8) != 0:
+            long_util_data -= long_util_data % 8
+
+        n_comp_fragments = data_len / long_util_data
+        if (data_len % long_util_data) != 0:
+            n_part_fragments = 1
+
+    # Hay que enviar un unico fragmento de longitud maxima
+    elif data_len == long_util_data:
+        n_comp_fragments = 1
+
+    # Hay que enviar un unico fragmento sin longitud maxima
+    else:
+        n_part_fragments = 1
+
+    for i in range(n_comp_fragments):
+        datagram = bytearray()
+        datagram[VERSION_AND_IHL_I] = 0x45
+        datagram[TYPE_OF_SERVICE_S:TYPE_OF_SERVICE_E] = 1
+        datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = long_util_data + LONG_HEADER_IP
+        datagram[IPID_S:IPID_E] = IPID
+
+    last_fragment_size = data_len % long_util_data
+    if last_fragment_size != 0:
+        pass
+
+
+    """
+    ip_version = (data[VERSION_AND_IHL_I] & 0b11110000) >> 4
+    ihl        = (data[VERSION_AND_IHL_I] & 0b00001111) >> 0
+    typeof_service = data[1]
+    total_length = struct.unpack('!H', data[2:4])
+    ipid = struct.unpack('!H', data[4:6])
+    flag_reserved = (data[FLAGS_I] & 0b10000000) >> 7
+    flag_df       = (data[FLAGS_I] & 0b01000000) >> 6
+    flag_mf       = (data[FLAGS_I] & 0b00100000) >> 5
+
+
+    offset = struct.unpack('!H', data[OFFSET_S:OFFSET_E])[0] & 0x1FFF
+    time_to_live = data[TIME_TO_LIVE_I]
+    protocol = data[PROTOCOL_I]
+    checksum = struct.unpack('!H', data[CHECKSUM_S:CHECKSUM_E])[0]
+    src_ip  = struct.unpack('!I', data[IP_ORIG_S:IP_ORIG_E])[0]
+    dest_ip = struct.unpack('!I', data[IP_DEST_S:IP_DEST_E])[0]
+    
+    
+    """
