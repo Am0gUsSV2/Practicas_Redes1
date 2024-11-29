@@ -28,9 +28,8 @@ IP_MAX_HLEN = 60
 #   I = Index
 # Cabecera sin opciones = 20 bytes = 160 bits
 
-VERSION_AND_IHL_I = 0 #4 bits
-TYPE_OF_SERVICE_S = 1 #1 byte
-TYPE_OF_SERVICE_E = 1+1
+VERSION_AND_IHL_I = 0 # 4 bits + 4 bits
+TYPE_OF_SERVICE_I = 1 # 1 byte
 TOTAL_LENGTH_S = 2 #2 bytes
 TOTAL_LENGTH_E = 3+1
 IPID_S = 4 #2 bytes
@@ -50,7 +49,8 @@ OPTIONS_S = 20 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
 
 
 DEF_MTU = 1500 # En bytes
-LONG_HEADER_IP = 20
+LENGTH_IP_HEADER = 20
+TTL = 65
 
 
 
@@ -66,7 +66,7 @@ def chksum(msg):
     y = 0xa29f    
     for i in range(0, len(msg), 2):
         if (i+1) < len(msg):
-            a = msg[i] 
+            a = msg[i]
             b = msg[i+1]
             s = s + (a+(b << 8))
         elif (i+1)==len(msg):
@@ -258,6 +258,22 @@ def initIP(interface,opts=None):
     if ret != 0:
         return False
 
+
+    # Set IP options
+    ipOpts = opts
+    if opts is not None:
+        len_opts = len(opts)
+        if len_opts > 40:
+            logging.error('La longitud de las opciones no puede ser superior a 40')
+            return False
+
+        # Si la longitud no es multiplo de 4, rellenar con 0
+        mod = len_opts % 4
+        if mod != 0:
+            for _ in range(4 - mod):
+                ipOpts += struct.pack('B', 0)
+
+
     # TODO: Almacenar en variables globales
     myIP = getIP(interface)
     myMtu = getMTU(interface)
@@ -265,13 +281,12 @@ def initIP(interface,opts=None):
     defaultGW = getDefaultGW(interface)
     ipOpts = opts
     registerEthCallback(process_IP_datagram, 0x0800)
-    IPID = 3 # NOTE: no se si el numero de pareja se pone asi
+    IPID = 3
 
     return True
 
 
 def sendIPDatagram(dstIP,data,protocol):
-    global IPID
     '''
         Nombre: sendIPDatagram
         Descripción: Esta función construye un datagrama IP y lo envía. En caso de que los datos a enviar sean muy grandes la función
@@ -295,65 +310,126 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
+    global IPID, ipOpts
+
     #NOTE: STATUS : Implementing...
     if dstIP is None:
         logging.error("Dest IP is None")
         return False
 
+
     # Determinar si se debe fragmentar
-    data_len = len(data)
-    long_util_data = myMtu - LONG_HEADER_IP
+    len_data = len(data)
+    len_ipOpts = 0 if ipOpts is None else len(ipOpts)
+    len_header = LENGTH_IP_HEADER + len_ipOpts
+    max_data_per_fragment = myMtu - len_header
 
     n_comp_fragments = 0    # Numero de fragmentos con longitud maxima
     n_part_fragments = 0    # Numero de fragmentos sin longitud maxima
 
     # Determinar si se partir los datos en varios fragmentos
-    if data_len > long_util_data:
+    if len_data > max_data_per_fragment:
         # Si la longitud de los datos utiles no es multiplo de 8 se hace que si lo sea
-        if (long_util_data % 8) != 0:
-            long_util_data -= long_util_data % 8
+        if (max_data_per_fragment % 8) != 0:
+            max_data_per_fragment -= max_data_per_fragment % 8
 
-        n_comp_fragments = data_len / long_util_data
-        if (data_len % long_util_data) != 0:
+        n_comp_fragments = len_data // max_data_per_fragment
+        if (len_data % max_data_per_fragment) != 0:
             n_part_fragments = 1
 
     # Hay que enviar un unico fragmento de longitud maxima
-    elif data_len == long_util_data:
+    elif len_data == max_data_per_fragment:
         n_comp_fragments = 1
 
     # Hay que enviar un unico fragmento sin longitud maxima
     else:
         n_part_fragments = 1
 
+
+    n_fragments = n_comp_fragments + n_part_fragments
+
+    # Calcular bandera de fragmentacion de datagrama
+    flag_reserved = 0
+    if n_fragments > 1:
+        flag_df = 1
+    else:
+        flag_df = 0
+
+    # Construir y enviar fragmentos
+    len_fragment = max_data_per_fragment + len_header
+    ipv_and_ihl = (0x4 >> 4) + (len_header) // 4
+
     for i in range(n_comp_fragments):
         datagram = bytearray()
-        datagram[VERSION_AND_IHL_I] = 0x45
-        datagram[TYPE_OF_SERVICE_S:TYPE_OF_SERVICE_E] = 1
-        datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = long_util_data + LONG_HEADER_IP
-        datagram[IPID_S:IPID_E] = IPID
+        datagram[VERSION_AND_IHL_I] = ipv_and_ihl
+        datagram[TYPE_OF_SERVICE_I] = 1
+        datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = struct.pack('!H', len_fragment)
+        datagram[IPID_S:IPID_E] = struct.pack('!H', IPID)
 
-    last_fragment_size = data_len % long_util_data
-    if last_fragment_size != 0:
-        pass
-
-
-    """
-    ip_version = (data[VERSION_AND_IHL_I] & 0b11110000) >> 4
-    ihl        = (data[VERSION_AND_IHL_I] & 0b00001111) >> 0
-    typeof_service = data[1]
-    total_length = struct.unpack('!H', data[2:4])
-    ipid = struct.unpack('!H', data[4:6])
-    flag_reserved = (data[FLAGS_I] & 0b10000000) >> 7
-    flag_df       = (data[FLAGS_I] & 0b01000000) >> 6
-    flag_mf       = (data[FLAGS_I] & 0b00100000) >> 5
+        if i < n_fragments - 1:
+            flag_mf = 1
+        else:
+            flag_mf = 0
 
 
-    offset = struct.unpack('!H', data[OFFSET_S:OFFSET_E])[0] & 0x1FFF
-    time_to_live = data[TIME_TO_LIVE_I]
-    protocol = data[PROTOCOL_I]
-    checksum = struct.unpack('!H', data[CHECKSUM_S:CHECKSUM_E])[0]
-    src_ip  = struct.unpack('!I', data[IP_ORIG_S:IP_ORIG_E])[0]
-    dest_ip = struct.unpack('!I', data[IP_DEST_S:IP_DEST_E])[0]
-    
-    
-    """
+        offset = (i * max_data_per_fragment) // 8
+
+        flags_and_offset =  (flag_reserved << 15) + \
+                            (flag_mf << 14) + \
+                            (flag_df << 13) + \
+                            offset
+
+        datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
+        datagram[TIME_TO_LIVE_I] = TTL
+        datagram[PROTOCOL_I] = protocol
+        datagram[CHECKSUM_S:CHECKSUM_E] = 0
+        datagram[IP_ORIG_S:IP_ORIG_E] = myIP
+        datagram[IP_DEST_S:IP_DEST_E] = dstIP
+
+        # Calculate checksum
+        datagram[CHECKSUM_S:CHECKSUM_E] = chksum(datagram[0:20])
+
+        # Build final datagram
+        datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
+
+        # Send datagram
+        sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+
+
+
+    if n_part_fragments != 0:
+        len_fragment = len_data % max_data_per_fragment + len_header
+        ipv_and_ihl = (0x4 >> 4) + (len_header) // 4
+
+        datagram = bytearray()
+        datagram[VERSION_AND_IHL_I] = ipv_and_ihl
+        datagram[TYPE_OF_SERVICE_I] = 1
+        datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = struct.pack('!H', len_fragment)
+        datagram[IPID_S:IPID_E] = struct.pack('!H', IPID)
+
+        flag_mf = 0
+        offset = (i * max_data_per_fragment) // 8
+
+        flags_and_offset =  (flag_reserved << 15) + \
+                            (flag_mf << 14) + \
+                            (flag_df << 13) + \
+                            offset
+
+        datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
+        datagram[TIME_TO_LIVE_I] = TTL
+        datagram[PROTOCOL_I] = protocol
+        datagram[CHECKSUM_S:CHECKSUM_E] = 0
+        datagram[IP_ORIG_S:IP_ORIG_E] = myIP
+        datagram[IP_DEST_S:IP_DEST_E] = dstIP
+
+        # Calculate checksum
+        datagram[CHECKSUM_S:CHECKSUM_E] = chksum(datagram[0:20])
+
+        # Build final datagram
+        datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
+
+        # Send datagram
+        sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+
+
+    IPID += 1
