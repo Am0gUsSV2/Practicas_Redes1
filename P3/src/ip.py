@@ -182,7 +182,8 @@ def process_IP_datagram(us,header,data,srcMac):
     # NOTE: Maybe we gotta do smth about options, probably not
 
     # Si el checksum no es correcto se descarta el paquete
-    if checksum != chksum(data[0:ihl]):
+    data[CHECKSUM_S:CHECKSUM_E] = 0
+    if checksum != chksum(data[0:20]):
         return
 
     # Si hay más fragmentos, devolver (no reensamblamos)
@@ -312,6 +313,8 @@ def sendIPDatagram(dstIP,data,protocol):
     '''
     global IPID, ipOpts
 
+    st = 0  # Controla si se ha enviado bien el datagrama Ethernet
+
     #NOTE: STATUS : Implementing...
     if dstIP is None:
         logging.error("Dest IP is None")
@@ -393,7 +396,7 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
 
         # Send datagram
-        sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
 
 
 
@@ -429,7 +432,9 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
 
         # Send datagram
-        sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
 
 
     IPID += 1
+
+    return True if st == 0 else False

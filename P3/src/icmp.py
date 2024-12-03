@@ -20,22 +20,21 @@ ICMP_ECHO_REPLY_TYPE = 0
 ############################
 #S = Start
 #E = End 
-ICMP_TYPE_S = 0 #1 byte
-ICMP_TYPE_E = 7 + 1
-ICMP_CODE_S = 8 #1 byte
-ICMP_CODE_E = 15 + 1
-ICMP_CHKSUM_S = 16 #2 bytes 
-ICMP_CHKSUM_E = 31 + 1
-ICMP_IDENTIFIER_S = 32 #2 bytes
-ICMP_IDENTIFIER_E = 47 + 1
-ICMP_SEQ_NUMBER_S = 48 #2 bytes
-ICMP_SEQ_NUMBER_S = 63 + 1
-#DATA...
+#I = Index
+ICMP_TYPE_I = 0 #1 byte
+ICMP_CODE_I = 1 #1 byte
+ICMP_CHKSUM_S = 2 #2 bytes 
+ICMP_CHKSUM_E = 3 + 1
+ICMP_IDENTIFIER_S = 4 #2 bytes
+ICMP_IDENTIFIER_E = 5 + 1
+ICMP_SEQ_NUMBER_S = 6 #2 bytes
+ICMP_SEQ_NUMBER_E = 7 + 1
+
 
 timeLock = Lock()
 icmp_send_times = {}
 
-def process_ICMP_message(us,header,data,srcIp):
+def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
     '''
         Nombre: process_ICMP_message
         Descripción: Esta función procesa un mensaje ICMP. Esta función se ejecutará por cada datagrama IP que contenga
@@ -62,9 +61,42 @@ def process_ICMP_message(us,header,data,srcIp):
             -data: array de bytes con el conenido del mensaje ICMP
             -srcIP: dirección IP que ha enviado el datagrama actual.
         Retorno: Ninguno
-          
     '''
-    
+    icmp_cksum = struct.unpack('!H', data[ICMP_CHKSUM_S:ICMP_CHKSUM_E])[0]
+
+    # Comprobacion de checksum
+    data_orig = data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:]
+    if icmp_cksum != chksum(data_orig):
+        logging.debug('Checksum does not match')
+        return
+
+    echo_type = data[ICMP_TYPE_I]
+    code = data[ICMP_CODE_I]
+    identifier = data[ICMP_IDENTIFIER_S:ICMP_IDENTIFIER_E]
+    seq_number = data[ICMP_SEQ_NUMBER_S:ICMP_SEQ_NUMBER_E]
+
+
+    type_as_str = 'request' if echo_type == 8 else 'reply' if echo_type == 0 else 'unknown'
+    logging.debug( 'Datagrama ICMP recibido:')
+    logging.debug(f'   - Type: {type} ({type_as_str})')
+    logging.debug(f'   - Code: {code}')
+
+
+    # Process request
+    if type == 8:
+        sendICMPMessage(data[ICMP_SEQ_NUMBER_E:], ICMP_ECHO_REPLY_TYPE, 0, identifier, seq_number, srcIp)
+    # Process reply
+    elif type == 0:
+        key = srcIp + identifier + seq_number
+
+        with timeLock:
+            send_time: float = icmp_send_times.get(key, None)
+
+        if send_time is not None:
+            diff_time = (header.ts.tv_sec + header.ts.tv_usec*0.000001) - send_time
+
+            logging.debug(f'   - RTT: {diff_time} sec')
+
 
 def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     '''
@@ -93,10 +125,30 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
             -icmp_seqnum: entero que contiene el valor del campo Seqnum de ICMP a enviar
             -dstIP: entero de 32 bits con la IP destino del mensaje ICMP
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
-          
     '''
-  
+    if type != 0 and type != 8:
+        return False
+
     icmp_message = bytes()
+
+    icmp_message += type
+    icmp_message += code
+    icmp_message += struct.pack('!H', 0)
+    icmp_message += struct.pack('!H', icmp_id)
+    icmp_message += struct.pack('!H', icmp_seqnum)
+    icmp_message += data
+
+    icmp_message[ICMP_CHKSUM_S:ICMP_CHKSUM_E] = chksum(icmp_message)
+
+    if type == ICMP_ECHO_REQUEST_TYPE:
+        key = dstIP + icmp_id + icmp_seqnum
+        send_time = time.time()
+
+        with timeLock:
+            icmp_send_times[key] = send_time
+
+    return sendIPDatagram(dstIP, data, ICMP_PROTO)
+
    
 def initICMP():
     '''
@@ -108,5 +160,5 @@ def initICMP():
         Argumentos:
             -Ninguno
         Retorno: Ninguno
-          
     '''
+    registerIPProtocol(process_ICMP_message, ICMP_PROTO)

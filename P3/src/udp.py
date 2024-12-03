@@ -33,7 +33,6 @@ def getUDPSourcePort():
         Argumentos:
             -Ninguno
         Retorno: Entero de 16 bits con el número de puerto origen disponible
-          
     '''
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('', 0))
@@ -60,12 +59,21 @@ def process_UDP_datagram(us,header,data,srcIP):
             -data: array de bytes con el conenido del datagrama UDP
             -srcIP: dirección IP que ha enviado el datagrama actual.
         Retorno: Ninguno
-          
     '''
+    # NOTE: STATUS = Implemented
+    src_port = struct.unpack('!H', data[SRC_PORT_S:SRC_PORT_E]) 
+    dst_port = struct.unpack('!H', data[DST_PORT_S:DST_PORT_E]) 
+    length = struct.unpack('!H', data[UDP_LENGTH_S:UDP_LENGTH_E]) 
+
+    logging.debug( 'Datagrama UDP recibido:')
+    logging.debug(f'   - Src Port: {src_port}')
+    logging.debug(f'   - Dst Port: {dst_port}')
+    logging.debug(f'   - Data:     {data[CHECKSUM_E:]}')
+
 
 
 def sendUDPDatagram(data,dstPort,dstIP):
-     '''
+    '''
         Nombre: sendUDPDatagram
         Descripción: Esta función construye un datagrama UDP y lo envía
         Esta función debe realizar, al menos, las siguientes tareas:
@@ -80,10 +88,15 @@ def sendUDPDatagram(data,dstPort,dstIP):
             -dstPort: entero de 16 bits que indica el número de puerto destino a usar
             -dstIP: entero de 32 bits con la IP destino del datagrama UDP
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
-          
     '''
-     
     udp_datagram = bytes()
+    udp_datagram += struct.pack('!H', getUDPSourcePort())
+    udp_datagram += struct.pack('!H', dstPort)
+    udp_datagram += struct.pack('!H', 64 + len(data))
+    udp_datagram += struct.pack('!H', 0)
+    udp_datagram += data
+
+    return sendIPDatagram(dstIP, udp_datagram, UDP_PROTO)
 
 
 def initUDP():
@@ -96,5 +109,5 @@ def initUDP():
         Argumentos:
             -Ninguno
         Retorno: Ninguno
-          
     '''
+    registerIPProtocol(process_UDP_datagram, UDP_PROTO)
