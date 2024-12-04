@@ -73,15 +73,18 @@ if __name__ == "__main__":
 	icmp_data = b'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 	#TODO: construir mensaje ICMP según opción --icmpsize
-	if args.icmpSize < 1:
+	icmp_size = int(args.icmpSize)
+	if icmp_size < 1:
 		logging.error('El tamanio del paquete ICMP no puede ser menor que 1')
 		parser.print_help()
 		sys.exit(-1)
 
-	icmp_data = (icmp_data*(args.icmpSize // LEN_ICMP_DATA) + 1)[:args.icmpSize]
+	icmp_data = (icmp_data*((icmp_size // LEN_ICMP_DATA) + 1))[:icmp_size]
 	#NOTE: Status = Implemented
 	#NOTE: Test = Not tested
-
+	import printer as pt
+	
+	print(pt.IP_to_str(getNetmask(args.interface)))
 	startEthernetLevel(args.interface)
 	initICMP()
 	initUDP()

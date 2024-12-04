@@ -62,7 +62,8 @@ def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
             -srcIP: dirección IP que ha enviado el datagrama actual.
         Retorno: Ninguno
     '''
-    icmp_cksum = struct.unpack('!H', data[ICMP_CHKSUM_S:ICMP_CHKSUM_E])[0]
+    logging.debug("[FUNC] process_ICMP_message")
+    icmp_cksum = struct.unpack('H', data[ICMP_CHKSUM_S:ICMP_CHKSUM_E])[0]
 
     # Comprobacion de checksum
     data_orig = data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:]
@@ -76,17 +77,17 @@ def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
     seq_number = data[ICMP_SEQ_NUMBER_S:ICMP_SEQ_NUMBER_E]
 
 
-    type_as_str = 'request' if echo_type == 8 else 'reply' if echo_type == 0 else 'unknown'
+    type_as_str = 'request' if echo_type == ICMP_ECHO_REQUEST_TYPE else 'reply' if echo_type == ICMP_ECHO_REPLY_TYPE else 'unknown'
     logging.debug( 'Datagrama ICMP recibido:')
     logging.debug(f'   - Type: {type} ({type_as_str})')
     logging.debug(f'   - Code: {code}')
 
 
     # Process request
-    if type == 8:
+    if type == ICMP_ECHO_REQUEST_TYPE:
         sendICMPMessage(data[ICMP_SEQ_NUMBER_E:], ICMP_ECHO_REPLY_TYPE, 0, identifier, seq_number, srcIp)
     # Process reply
-    elif type == 0:
+    elif type == ICMP_ECHO_REPLY_TYPE:
         key = srcIp + identifier + seq_number
 
         with timeLock:
@@ -126,7 +127,8 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
             -dstIP: entero de 32 bits con la IP destino del mensaje ICMP
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
     '''
-    if type != 0 and type != 8:
+    logging.debug("[FUNC] sendICMPMessage")
+    if type != ICMP_ECHO_REQUEST_TYPE and type != ICMP_ECHO_REPLY_TYPE:
         return False
 
     icmp_message = bytes()
@@ -138,7 +140,7 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
     icmp_message += struct.pack('!H', icmp_seqnum)
     icmp_message += data
 
-    icmp_message[ICMP_CHKSUM_S:ICMP_CHKSUM_E] = chksum(icmp_message)
+    icmp_message[ICMP_CHKSUM_S:ICMP_CHKSUM_E] = struct.pack('H', chksum(icmp_message))
 
     if type == ICMP_ECHO_REQUEST_TYPE:
         key = dstIP + icmp_id + icmp_seqnum

@@ -9,6 +9,7 @@ from ethernet import *
 from arp import *
 from fcntl import ioctl
 import subprocess
+import printer as pt
 SIOCGIFMTU = 0x8921
 SIOCGIFNETMASK = 0x891b
 #Diccionario de protocolos. Las claves con los valores numéricos de protocolos de nivel superior a IP
@@ -158,11 +159,12 @@ def process_IP_datagram(us,header,data,srcMac):
         Retorno: Ninguno
     '''
     # NOTE: STATUS = Implemented
+    logging.debug("[FUNC] process_IP_datagram")
     ip_version = (data[VERSION_AND_IHL_I] & 0b11110000) >> 4
     ihl        = (data[VERSION_AND_IHL_I] & 0b00001111) >> 0
     typeof_service = data[1]
-    total_length = struct.unpack('!H', data[2:4])
-    ipid = struct.unpack('!H', data[4:6])
+    total_length = struct.unpack('!H', data[2:4])[0]
+    ipid = struct.unpack('!H', data[4:6])[0]
     flag_reserved = (data[FLAGS_I] & 0b10000000) >> 7
     flag_df       = (data[FLAGS_I] & 0b01000000) >> 6
     flag_mf       = (data[FLAGS_I] & 0b00100000) >> 5
@@ -171,7 +173,7 @@ def process_IP_datagram(us,header,data,srcMac):
     offset = struct.unpack('!H', data[OFFSET_S:OFFSET_E])[0] & 0x1FFF
     time_to_live = data[TIME_TO_LIVE_I]
     protocol = data[PROTOCOL_I]
-    checksum = struct.unpack('!H', data[CHECKSUM_S:CHECKSUM_E])[0]
+    checksum = struct.unpack('H', data[CHECKSUM_S:CHECKSUM_E])[0]
     src_ip  = struct.unpack('!I', data[IP_ORIG_S:IP_ORIG_E])[0]
     dest_ip = struct.unpack('!I', data[IP_DEST_S:IP_DEST_E])[0]
 
@@ -182,13 +184,14 @@ def process_IP_datagram(us,header,data,srcMac):
     # NOTE: Maybe we gotta do smth about options, probably not
 
     # Si el checksum no es correcto se descarta el paquete
-    data[CHECKSUM_S:CHECKSUM_E] = 0
-    if checksum != chksum(data[0:20]):
+    if checksum != chksum(data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:20]):
+        logging.debug("Los checksum no coinciden")
         return
 
     # Si hay más fragmentos, devolver (no reensamblamos)
     if offset != 0:
         return
+
 
     logging.debug( 'Trama IP recibida:')
     logging.debug(f'   - Header length: {ihl}')
@@ -197,14 +200,14 @@ def process_IP_datagram(us,header,data,srcMac):
     logging.debug(f'   - Flag DF:       {flag_df}')
     logging.debug(f'   - Flag MF:       {flag_mf}')
     logging.debug(f'   - Offset:        {offset}')
-    logging.debug(f'   - Source IP:     {src_ip}')
-    logging.debug(f'   - Dest IP:       {dest_ip}')
+    logging.debug(f'   - Source IP:     {pt.IP_to_str(src_ip)}')
+    logging.debug(f'   - Dest IP:       {pt.IP_to_str(dest_ip)}')
     logging.debug(f'   - Protocol:      {protocol}')
 
 
     callback = protocols.get(protocol, None)
     if callback is not None:
-        callback(data[60:])
+        callback(None, header, data[ihl:], src_ip)
 
 
 
@@ -253,8 +256,9 @@ def initIP(interface,opts=None):
         Retorno: True o False en función de si se ha inicializado el nivel o no
     '''
     #NOTE: STATUS = Implemented, TEST = Not tested
-    global myIP, myMtu, netmask, defaultGW,ipOpts,IPID
 
+    global myIP, myMtu, netmask, defaultGW,ipOpts,IPID
+    logging.debug("[FUNC] initIP")
     ret = initARP(interface)
     if ret != 0:
         return False
@@ -312,7 +316,7 @@ def sendIPDatagram(dstIP,data,protocol):
           
     '''
     global IPID, ipOpts
-
+    logging.debug("[FUNC] sendIPDatagram")
     st = 0  # Controla si se ha enviado bien el datagrama Ethernet
 
     #NOTE: STATUS : Implementing...
@@ -360,10 +364,10 @@ def sendIPDatagram(dstIP,data,protocol):
 
     # Construir y enviar fragmentos
     len_fragment = max_data_per_fragment + len_header
-    ipv_and_ihl = (0x4 >> 4) + (len_header) // 4
+    ipv_and_ihl = (0x4 << 4) + (len_header) // 4
 
     for i in range(n_comp_fragments):
-        datagram = bytearray()
+        datagram = bytearray(20)
         datagram[VERSION_AND_IHL_I] = ipv_and_ihl
         datagram[TYPE_OF_SERVICE_I] = 1
         datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = struct.pack('!H', len_fragment)
@@ -385,33 +389,33 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
         datagram[TIME_TO_LIVE_I] = TTL
         datagram[PROTOCOL_I] = protocol
-        datagram[CHECKSUM_S:CHECKSUM_E] = 0
-        datagram[IP_ORIG_S:IP_ORIG_E] = myIP
-        datagram[IP_DEST_S:IP_DEST_E] = dstIP
+        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('!H', 0)
+        datagram[IP_ORIG_S:IP_ORIG_E] = struct.pack('!I', myIP)
+        datagram[IP_DEST_S:IP_DEST_E] = struct.pack('!I', dstIP)
 
         # Calculate checksum
-        datagram[CHECKSUM_S:CHECKSUM_E] = chksum(datagram[0:20])
+        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
 
         # Build final datagram
-        datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
+        datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)
 
         # Send datagram
-        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, ARPResolution(dstIP))
 
 
 
     if n_part_fragments != 0:
         len_fragment = len_data % max_data_per_fragment + len_header
-        ipv_and_ihl = (0x4 >> 4) + (len_header) // 4
+        ipv_and_ihl = (0x4 << 4) + (len_header) // 4
 
-        datagram = bytearray()
+        datagram = bytearray(20)
         datagram[VERSION_AND_IHL_I] = ipv_and_ihl
         datagram[TYPE_OF_SERVICE_I] = 1
         datagram[TOTAL_LENGTH_S:TOTAL_LENGTH_E] = struct.pack('!H', len_fragment)
         datagram[IPID_S:IPID_E] = struct.pack('!H', IPID)
 
         flag_mf = 0
-        offset = (i * max_data_per_fragment) // 8
+        offset = (n_comp_fragments * max_data_per_fragment) // 8
 
         flags_and_offset =  (flag_reserved << 15) + \
                             (flag_mf << 14) + \
@@ -421,18 +425,18 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
         datagram[TIME_TO_LIVE_I] = TTL
         datagram[PROTOCOL_I] = protocol
-        datagram[CHECKSUM_S:CHECKSUM_E] = 0
-        datagram[IP_ORIG_S:IP_ORIG_E] = myIP
-        datagram[IP_DEST_S:IP_DEST_E] = dstIP
+        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('!H', 0)
+        datagram[IP_ORIG_S:IP_ORIG_E] = struct.pack('!I', myIP)
+        datagram[IP_DEST_S:IP_DEST_E] = struct.pack('!I', dstIP)
 
         # Calculate checksum
-        datagram[CHECKSUM_S:CHECKSUM_E] = chksum(datagram[0:20])
+        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
 
         # Build final datagram
-        datagram = bytes(datagram[0:20]) + ipOpts + bytes(data)
+        datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)
 
         # Send datagram
-        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, netmask)
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, ARPResolution(dstIP))
 
 
     IPID += 1

@@ -61,9 +61,10 @@ def process_UDP_datagram(us,header,data,srcIP):
         Retorno: Ninguno
     '''
     # NOTE: STATUS = Implemented
-    src_port = struct.unpack('!H', data[SRC_PORT_S:SRC_PORT_E]) 
-    dst_port = struct.unpack('!H', data[DST_PORT_S:DST_PORT_E]) 
-    length = struct.unpack('!H', data[UDP_LENGTH_S:UDP_LENGTH_E]) 
+    logging.debug("[FUNC] process_UDP_datagram")
+    src_port = struct.unpack('!H', data[SRC_PORT_S:SRC_PORT_E])[0]
+    dst_port = struct.unpack('!H', data[DST_PORT_S:DST_PORT_E])[0]
+    length = struct.unpack('!H', data[UDP_LENGTH_S:UDP_LENGTH_E])[0]
 
     logging.debug( 'Datagrama UDP recibido:')
     logging.debug(f'   - Src Port: {src_port}')
@@ -89,6 +90,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
             -dstIP: entero de 32 bits con la IP destino del datagrama UDP
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
     '''
+    logging.debug("[FUNC] sendUDPDatagram")
     udp_datagram = bytes()
     udp_datagram += struct.pack('!H', getUDPSourcePort())
     udp_datagram += struct.pack('!H', dstPort)
