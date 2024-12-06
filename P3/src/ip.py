@@ -190,6 +190,7 @@ def process_IP_datagram(us,header,data,srcMac):
 
     # Si hay más fragmentos, devolver (no reensamblamos)
     if offset != 0:
+        logging.debug(f'Recibido paquete con offset {offset}')
         return
 
 
@@ -315,7 +316,7 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    global IPID, ipOpts
+    global IPID, ipOpts, myMtu
     logging.debug("[FUNC] sendIPDatagram")
     st = 0  # Controla si se ha enviado bien el datagrama Ethernet
 
@@ -371,6 +372,7 @@ def sendIPDatagram(dstIP,data,protocol):
     ipv_and_ihl = (0x4 << 4) + (len_header) // 4
 
     for i in range(n_comp_fragments):
+        logging.debug(f'Fragment {i+1} / {n_fragments} : size={len_fragment}')
         datagram = bytearray(20)
         datagram[VERSION_AND_IHL_I] = ipv_and_ihl
         datagram[TYPE_OF_SERVICE_I] = 1
@@ -412,6 +414,7 @@ def sendIPDatagram(dstIP,data,protocol):
         len_fragment = len_data % max_data_per_fragment + len_header
         ipv_and_ihl = (0x4 << 4) + (len_header) // 4
 
+        logging.debug(f'Fragment {i+2} / {n_fragments} : size={len_fragment}')
         datagram = bytearray(20)
         datagram[VERSION_AND_IHL_I] = ipv_and_ihl
         datagram[TYPE_OF_SERVICE_I] = 1

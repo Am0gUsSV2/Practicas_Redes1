@@ -64,7 +64,8 @@ def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
     '''
     logging.debug("[FUNC] process_ICMP_message")
     icmp_cksum = struct.unpack('H', data[ICMP_CHKSUM_S:ICMP_CHKSUM_E])[0]
-
+    #logging.debug(f'Checksum paquete: {data[ICMP_CHKSUM_S:ICMP_CHKSUM_E]}')
+    #logging.debug(f'Checksum calculo: {chksum(data_orig)}')
     # Comprobacion de checksum
     data_orig = data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:]
     if icmp_cksum != chksum(data_orig):
@@ -133,8 +134,8 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
 
     icmp_message = bytes()
 
-    icmp_message += type
-    icmp_message += code
+    icmp_message += struct.pack('!B', type)
+    icmp_message += struct.pack('!B', code)
     icmp_message += struct.pack('!H', 0)
     icmp_message += struct.pack('!H', icmp_id)
     icmp_message += struct.pack('!H', icmp_seqnum)
