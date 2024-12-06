@@ -17,13 +17,13 @@ UDP_PROTO = 17
 #S = Start
 #E = End 
 SRC_PORT_S = 0 #2 bytes
-SRC_PORT_E = 15 + 1
-DST_PORT_S = 16 #2 bytes
-DST_PORT_E = 31 + 1
-UDP_LENGTH_S = 32 #2 bytes
-UDP_LENGTH_E = 47 + 1
-UDP_CHKSUM_S = 48 #2 bytes
-UDP_CHKSUM_E = 63 + 1
+SRC_PORT_E = 1 + 1
+DST_PORT_S = 2 #2 bytes
+DST_PORT_E = 3 + 1
+UDP_LENGTH_S = 4 #2 bytes
+UDP_LENGTH_E = 5 + 1
+UDP_CHKSUM_S = 6 #2 bytes
+UDP_CHKSUM_E = 7 + 1
 #DATA_OCTETS...
 
 def getUDPSourcePort():
@@ -69,7 +69,7 @@ def process_UDP_datagram(us,header,data,srcIP):
     logging.debug( 'Datagrama UDP recibido:')
     logging.debug(f'   - Src Port: {src_port}')
     logging.debug(f'   - Dst Port: {dst_port}')
-    logging.debug(f'   - Data:     {data[CHECKSUM_E:]}')
+    logging.debug(f'   - Data:     {data[UDP_CHKSUM_E:]}')
 
 
 
@@ -94,7 +94,7 @@ def sendUDPDatagram(data,dstPort,dstIP):
     udp_datagram = bytes()
     udp_datagram += struct.pack('!H', getUDPSourcePort())
     udp_datagram += struct.pack('!H', dstPort)
-    udp_datagram += struct.pack('!H', 64 + len(data))
+    udp_datagram += struct.pack('!H', 8 + len(data))
     udp_datagram += struct.pack('!H', 0)
     udp_datagram += data
 

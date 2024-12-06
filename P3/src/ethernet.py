@@ -80,7 +80,6 @@ def process_Ethernet_frame(us:ctypes.c_void_p,header:pcap_pkthdr,data:bytes) -> 
     global macAddress
 
     logging.debug('[FUNC] process_Ethernet_frame')
-    logging.debug('Trama nueva recibida.')
 
     mac_orig = data[SETH_S:SETH_E]
     mac_dest = data[TETH_S:TETH_E]

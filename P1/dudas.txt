@@ -1,3 +1,0 @@
-1. Cuando guardemos los datos de un paquete capturado en el fichero de tráfico, debemos guardar el tiempo absoluto de captura o su 
-   tiempo relativo respecto al primer paquete?
-2. Podemos hacer pdumper_desc una variable global?

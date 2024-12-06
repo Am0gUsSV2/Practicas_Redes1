@@ -324,6 +324,10 @@ def sendIPDatagram(dstIP,data,protocol):
         logging.error("Dest IP is None")
         return False
 
+    dstMAC = ARPResolution(dstIP)
+    if dstMAC is None:
+        logging.error("No se pudo resolver la dirección IP")
+        return False
 
     # Determinar si se debe fragmentar
     len_data = len(data)
@@ -400,7 +404,7 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)
 
         # Send datagram
-        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, ARPResolution(dstIP))
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, dstMAC)
 
 
 
@@ -436,7 +440,7 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)
 
         # Send datagram
-        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, ARPResolution(dstIP))
+        st += sendEthernetFrame(datagram, len_fragment, ETHERTYPE_IP, dstMAC)
 
 
     IPID += 1

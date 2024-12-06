@@ -126,7 +126,7 @@ def processARPRequest(data:bytes,MAC:bytes)->None:
     ip_orig: bytes  = struct.unpack('!I', data[SIP_S:SIP_E])[0]
     ip_dest: bytes  = struct.unpack('!I', data[TIP_S:TIP_E])[0]
 
-    if mac_orig != MAC:
+    if mac_orig == MAC:
         return
 
     if ip_dest != myIP:

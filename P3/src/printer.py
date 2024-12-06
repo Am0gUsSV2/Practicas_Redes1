@@ -5,7 +5,7 @@
              Roberto Martin Alonso, roberto.martinalonso@estudiante.uam.es
 
 '''    
-
+import logging
 import struct
 
 def MAC_to_str(mac: bytes) -> str:
@@ -37,13 +37,16 @@ def print_ethernet_header(data: bytes, ident: int = 0):
 
 
 def print_ARP_header(data: bytes, ident: int = 0):
-	print("\t"*ident, 'ARP REPLY:')
+	opcode = struct.unpack('!H', data[6:8])[0]
+	str = 'REQUEST' if opcode == 1 else 'REPLY' if opcode == 2 else '';
+
+	print("\t"*ident, f'ARP {str}')
 	ident += 1
 	print("\t"*ident, 'Hardware Type:         ', hex(struct.unpack('!H', data[0:2])[0]))
 	print("\t"*ident, 'Protocol Type:         ', hex(struct.unpack('!H', data[2:4])[0]))
 	print("\t"*ident, 'Ethernet Address Size: ', hex(struct.unpack('!B', data[4:5])[0]))
 	print("\t"*ident, 'Protocol Address Size: ', hex(struct.unpack('!B', data[5:6])[0]))
-	print("\t"*ident, 'OP Code:               ', hex(struct.unpack('!H', data[6:8])[0]))
+	print("\t"*ident, 'OP Code:               ', hex(opcode))
 	print("\t"*ident, 'Orig MAC:              ', MAC_to_str(data[8:14]))
 	print("\t"*ident, 'Orig IP:               ', IP_to_str(struct.unpack('!I', data[14:18])[0]))
 	print("\t"*ident, 'Dest MAC:              ', MAC_to_str(data[18:24]))
