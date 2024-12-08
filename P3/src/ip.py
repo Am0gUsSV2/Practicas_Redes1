@@ -40,8 +40,8 @@ OFFSET_S = 6 #13 bits
 OFFSET_E = 6+2
 TIME_TO_LIVE_I = 8 #1 byte
 PROTOCOL_I = 9 #1 byte
-CHECKSUM_S = 10 #2 bytes
-CHECKSUM_E = 11+1
+IP_CHECKSUM_S = 10 #2 bytes
+IP_CHECKSUM_E = 11+1
 IP_ORIG_S = 12 #4 bytes
 IP_ORIG_E = 15+1
 IP_DEST_S = 16 #4 bytes
@@ -49,7 +49,6 @@ IP_DEST_E = 19+1
 OPTIONS_S = 20 #Variable, desde 0 hasta 40 bytes y debe ser multiplo de 4 bytes
 
 
-DEF_MTU = 1500 # En bytes
 LENGTH_IP_HEADER = 20
 TTL = 65
 
@@ -173,7 +172,7 @@ def process_IP_datagram(us,header,data,srcMac):
     offset = struct.unpack('!H', data[OFFSET_S:OFFSET_E])[0] & 0x1FFF
     time_to_live = data[TIME_TO_LIVE_I]
     protocol = data[PROTOCOL_I]
-    checksum = struct.unpack('H', data[CHECKSUM_S:CHECKSUM_E])[0]
+    checksum = struct.unpack('H', data[IP_CHECKSUM_S:IP_CHECKSUM_E])[0]
     src_ip  = struct.unpack('!I', data[IP_ORIG_S:IP_ORIG_E])[0]
     dest_ip = struct.unpack('!I', data[IP_DEST_S:IP_DEST_E])[0]
 
@@ -184,7 +183,7 @@ def process_IP_datagram(us,header,data,srcMac):
     # NOTE: Maybe we gotta do smth about options, probably not
 
     # Si el checksum no es correcto se descarta el paquete
-    if checksum != chksum(data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:20]):
+    if checksum != chksum(data[0:IP_CHECKSUM_S] + struct.pack('!H', 0) + data[IP_CHECKSUM_E:20]):
         logging.debug("Los checksum no coinciden")
         return
 
@@ -395,12 +394,12 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
         datagram[TIME_TO_LIVE_I] = TTL
         datagram[PROTOCOL_I] = protocol
-        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('!H', 0)
+        datagram[IP_CHECKSUM_S:IP_CHECKSUM_E] = struct.pack('!H', 0)
         datagram[IP_ORIG_S:IP_ORIG_E] = struct.pack('!I', myIP)
         datagram[IP_DEST_S:IP_DEST_E] = struct.pack('!I', dstIP)
 
         # Calculate checksum
-        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
+        datagram[IP_CHECKSUM_S:IP_CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
 
         # Build final datagram
         datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)
@@ -414,7 +413,7 @@ def sendIPDatagram(dstIP,data,protocol):
         len_fragment = len_data % max_data_per_fragment + len_header
         ipv_and_ihl = (0x4 << 4) + (len_header) // 4
 
-        logging.debug(f'Fragment {i+2} / {n_fragments} : size={len_fragment}')
+        logging.debug(f'Fragment {n_fragments} / {n_fragments} : size={len_fragment}')
         datagram = bytearray(20)
         datagram[VERSION_AND_IHL_I] = ipv_and_ihl
         datagram[TYPE_OF_SERVICE_I] = 1
@@ -432,12 +431,12 @@ def sendIPDatagram(dstIP,data,protocol):
         datagram[OFFSET_S:OFFSET_E] = struct.pack('!H', flags_and_offset)
         datagram[TIME_TO_LIVE_I] = TTL
         datagram[PROTOCOL_I] = protocol
-        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('!H', 0)
+        datagram[IP_CHECKSUM_S:IP_CHECKSUM_E] = struct.pack('!H', 0)
         datagram[IP_ORIG_S:IP_ORIG_E] = struct.pack('!I', myIP)
         datagram[IP_DEST_S:IP_DEST_E] = struct.pack('!I', dstIP)
 
         # Calculate checksum
-        datagram[CHECKSUM_S:CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
+        datagram[IP_CHECKSUM_S:IP_CHECKSUM_E] = struct.pack('H', chksum(datagram[0:20])) 
 
         # Build final datagram
         datagram = bytes(datagram[0:20]) + (b'' if ipOpts is None else ipOpts) + bytes(data)

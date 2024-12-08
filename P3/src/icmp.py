@@ -64,31 +64,33 @@ def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
     '''
     logging.debug("[FUNC] process_ICMP_message")
     icmp_cksum = struct.unpack('H', data[ICMP_CHKSUM_S:ICMP_CHKSUM_E])[0]
-    #logging.debug(f'Checksum paquete: {data[ICMP_CHKSUM_S:ICMP_CHKSUM_E]}')
-    #logging.debug(f'Checksum calculo: {chksum(data_orig)}')
+
     # Comprobacion de checksum
-    data_orig = data[0:CHECKSUM_S] + struct.pack('!H', 0) + data[CHECKSUM_E:]
+    data_orig = data[0:ICMP_CHKSUM_S] + struct.pack('!H', 0) + data[ICMP_CHKSUM_E:]
     if icmp_cksum != chksum(data_orig):
         logging.debug('Checksum does not match')
         return
 
     echo_type = data[ICMP_TYPE_I]
     code = data[ICMP_CODE_I]
-    identifier = data[ICMP_IDENTIFIER_S:ICMP_IDENTIFIER_E]
-    seq_number = data[ICMP_SEQ_NUMBER_S:ICMP_SEQ_NUMBER_E]
+    identifier = struct.unpack('!H', data[ICMP_IDENTIFIER_S:ICMP_IDENTIFIER_E])[0]
+    seq_number = struct.unpack('!H', data[ICMP_SEQ_NUMBER_S:ICMP_SEQ_NUMBER_E])[0]
 
 
     type_as_str = 'request' if echo_type == ICMP_ECHO_REQUEST_TYPE else 'reply' if echo_type == ICMP_ECHO_REPLY_TYPE else 'unknown'
     logging.debug( 'Datagrama ICMP recibido:')
-    logging.debug(f'   - Type: {type} ({type_as_str})')
+    logging.debug(f'   - Type: {echo_type} ({type_as_str})')
     logging.debug(f'   - Code: {code}')
+    logging.debug(f'   - Iden: {identifier}')
+    logging.debug(f'   - Seqn: {seq_number}')
+    logging.debug(f'   - Data: {data[ICMP_SEQ_NUMBER_E:]}')
 
 
     # Process request
-    if type == ICMP_ECHO_REQUEST_TYPE:
+    if echo_type == ICMP_ECHO_REQUEST_TYPE:
         sendICMPMessage(data[ICMP_SEQ_NUMBER_E:], ICMP_ECHO_REPLY_TYPE, 0, identifier, seq_number, srcIp)
     # Process reply
-    elif type == ICMP_ECHO_REPLY_TYPE:
+    elif echo_type == ICMP_ECHO_REPLY_TYPE:
         key = srcIp + identifier + seq_number
 
         with timeLock:
@@ -100,7 +102,7 @@ def process_ICMP_message(us,header: pcap_pkthdr,data,srcIp):
             logging.debug(f'   - RTT: {diff_time} sec')
 
 
-def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
+def sendICMPMessage(data,echo_type,code,icmp_id,icmp_seqnum,dstIP):
     '''
         Nombre: sendICMPMessage
         Descripción: Esta función construye un mensaje ICMP y lo envía.
@@ -129,28 +131,38 @@ def sendICMPMessage(data,type,code,icmp_id,icmp_seqnum,dstIP):
         Retorno: True o False en función de si se ha enviado el mensaje correctamente o no
     '''
     logging.debug("[FUNC] sendICMPMessage")
-    if type != ICMP_ECHO_REQUEST_TYPE and type != ICMP_ECHO_REPLY_TYPE:
+    if echo_type != ICMP_ECHO_REQUEST_TYPE and echo_type != ICMP_ECHO_REPLY_TYPE:
         return False
 
     icmp_message = bytes()
 
-    icmp_message += struct.pack('!B', type)
+    icmp_message += struct.pack('!B', echo_type)
     icmp_message += struct.pack('!B', code)
     icmp_message += struct.pack('!H', 0)
     icmp_message += struct.pack('!H', icmp_id)
     icmp_message += struct.pack('!H', icmp_seqnum)
     icmp_message += data
 
-    icmp_message[ICMP_CHKSUM_S:ICMP_CHKSUM_E] = struct.pack('H', chksum(icmp_message))
+    if len(data) % 2 != 0:
+        icmp_message += struct.pack('!B', 0)
 
-    if type == ICMP_ECHO_REQUEST_TYPE:
+    icmp_message = icmp_message[:ICMP_CHKSUM_S] + struct.pack('H', chksum(icmp_message)) + icmp_message[ICMP_CHKSUM_E:]
+
+    if echo_type == ICMP_ECHO_REQUEST_TYPE:
         key = dstIP + icmp_id + icmp_seqnum
         send_time = time.time()
 
         with timeLock:
             icmp_send_times[key] = send_time
 
-    return sendIPDatagram(dstIP, data, ICMP_PROTO)
+    logging.debug( 'Datagrama ICMP enviado:')
+    logging.debug(f'   - Type: {echo_type}')
+    logging.debug(f'   - Code: {code}')
+    logging.debug(f'   - Iden: {icmp_id}')
+    logging.debug(f'   - Seqn: {icmp_seqnum}')
+    logging.debug(f'   - Data: {data}')
+
+    return sendIPDatagram(dstIP, icmp_message, ICMP_PROTO)
 
    
 def initICMP():
