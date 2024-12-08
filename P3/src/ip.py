@@ -315,19 +315,26 @@ def sendIPDatagram(dstIP,data,protocol):
         Retorno: True o False en función de si se ha enviado el datagrama correctamente o no
           
     '''
-    global IPID, ipOpts, myMtu
+    global IPID, ipOpts, myMtu, netmask, myIP, defaultGW
     logging.debug("[FUNC] sendIPDatagram")
     st = 0  # Controla si se ha enviado bien el datagrama Ethernet
 
-    #NOTE: STATUS : Implementing...
     if dstIP is None:
         logging.error("Dest IP is None")
         return False
 
-    dstMAC = ARPResolution(dstIP)
+    # Obtener la MAC de destino. Si la dirección IP de destino está en la misma subred
+    # hacer un ARP Resolution. Si no, mandar al Gateway para que la envie a la Internet
+    if (myIP & netmask) == (dstIP & netmask):
+        IP_to_resolve = dstIP
+    else:
+        IP_to_resolve = defaultGW
+
+    dstMAC = ARPResolution(IP_to_resolve)
     if dstMAC is None:
         logging.error("No se pudo resolver la dirección IP")
         return False
+
 
     # Determinar si se debe fragmentar
     len_data = len(data)
